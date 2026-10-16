@@ -111,25 +111,90 @@ export default function AdminDashboard() {
   const categoryMax = Math.max(1, ...(d.categories || []).map((c) => Number(c.revenue || 0)));
 
   const exportCsv = () => {
-    if (filteredProducts.length === 0) return toast("No product data to export", "err");
-    const headers = ["Product ID", "Product Name", "Category", "Units Sold", "Total Revenue", "COGS", "Gross Profit", "Margin %", "Current Stock"];
-    const rows = filteredProducts.map((p) => [
-      p.id,
-      `"${p.name.replace(/"/g, '""')}"`,
-      `"${p.category.replace(/"/g, '""')}"`,
-      p.units_sold,
-      p.revenue,
-      p.cogs,
-      p.gross_profit,
-      p.margin_pct,
-      p.current_stock,
-    ]);
+    let headers = [];
+    let rows = [];
+    let filename = "";
+
+    if (reportTab === "products") {
+      if (filteredProducts.length === 0) return toast("No product data to export", "err");
+      headers = ["Product ID", "Product Name", "Category", "Units Sold", "Total Revenue", "COGS", "Gross Profit", "Margin %", "Current Stock"];
+      rows = filteredProducts.map((p) => [
+        p.id,
+        `"${p.name.replace(/"/g, '""')}"`,
+        `"${p.category.replace(/"/g, '""')}"`,
+        p.units_sold,
+        p.revenue,
+        p.cogs,
+        p.gross_profit,
+        p.margin_pct,
+        p.current_stock,
+      ]);
+      filename = `JOYCE_POS_Products_${from}_to_${to}.csv`;
+    } else if (reportTab === "employees") {
+      if (!d.top_employees || d.top_employees.length === 0) return toast("No employee data to export", "err");
+      headers = ["Employee Name", "Base Salary", "Commissions", "LD Commissions", "Total Income"];
+      rows = d.top_employees.map((e) => [
+        `"${e.employee_name.replace(/"/g, '""')}"`,
+        e.salary,
+        e.commission,
+        e.ld_commission,
+        e.total,
+      ]);
+      filename = `JOYCE_POS_Top_Employees_${from}_to_${to}.csv`;
+    } else if (reportTab === "shifts") {
+      if (!d.shift_history || d.shift_history.length === 0) return toast("No shift data to export", "err");
+      headers = [
+        "Shift ID",
+        "Business Date",
+        "Cashier",
+        "Opened At",
+        "Closed At",
+        "Opening Float",
+        "Cash Sales",
+        "Expenses",
+        "Salaries",
+        "Commissions",
+        "LD Commissions",
+        "Expected Cash",
+        "Closing Cash",
+        "Variance",
+        "Status",
+      ];
+      rows = d.shift_history.map((s) => [
+        s.id,
+        s.business_date,
+        `"${(s.opened_by || "").replace(/"/g, '""')}"`,
+        `"${s.opened_at || ""}"`,
+        `"${s.closed_at || ""}"`,
+        s.opening_cash,
+        s.cash_sales,
+        s.expenses,
+        s.salaries || 0,
+        s.commissions || 0,
+        s.ld_commissions || 0,
+        s.expected_cash,
+        s.closing_cash || 0,
+        Number(s.closing_cash || 0) - Number(s.expected_cash || 0),
+        s.status,
+      ]);
+      filename = `JOYCE_POS_Shift_Audit_${from}_to_${to}.csv`;
+    } else {
+      if (!d.expense_categories || d.expense_categories.length === 0) return toast("No expense data to export", "err");
+      headers = ["Expense Category", "Transaction Count", "Total Amount"];
+      rows = d.expense_categories.map((c) => [
+        `"${c.category.replace(/"/g, '""')}"`,
+        c.count,
+        c.total,
+      ]);
+      filename = `JOYCE_POS_Expenses_${from}_to_${to}.csv`;
+    }
+
     const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.setAttribute("href", url);
-    link.setAttribute("download", `JOYCE_POS_Admin_Report_${from}_to_${to}.csv`);
+    link.setAttribute("download", filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -326,6 +391,112 @@ export default function AdminDashboard() {
         </div>
       </section>
 
+      {/* Top Performer Employees (Highest Income Graph) */}
+      <section className="card" style={{ marginBottom: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Users size={18} color="var(--accent)" />
+            <h3 style={{ margin: 0 }}>Top Performer Employees (Highest Income)</h3>
+          </div>
+          <div style={{ display: "flex", gap: 14, fontSize: 12, alignItems: "center" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: "#8b5cf6" }} /> Base Salary
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: "#38bdf8" }} /> Commissions
+            </span>
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: "#2fcf8a" }} /> LD Commissions
+            </span>
+          </div>
+        </div>
+
+        {!d.top_employees || d.top_employees.length === 0 ? (
+          <Empty text="No employee earnings recorded in this date range" />
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {(() => {
+              const maxEmpTotal = Math.max(1, ...d.top_employees.map((e) => Number(e.total || 0)));
+              return d.top_employees.map((emp, idx) => {
+                const total = Number(emp.total || 0);
+                const salary = Number(emp.salary || 0);
+                const comm = Number(emp.commission || 0);
+                const ld = Number(emp.ld_commission || 0);
+                const barWidth = Math.max(6, (total / maxEmpTotal) * 100);
+
+                const salaryPct = total > 0 ? (salary / total) * 100 : 0;
+                const commPct = total > 0 ? (comm / total) * 100 : 0;
+                const ldPct = total > 0 ? (ld / total) * 100 : 0;
+
+                const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`;
+
+                return (
+                  <div key={emp.employee_name} style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 13 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontWeight: 700, width: 22, textAlign: "center" }}>{medal}</span>
+                        <span style={{ fontWeight: 600 }}>{emp.employee_name}</span>
+                        <span className="muted" style={{ fontSize: 11 }}>
+                          (Salary: {peso(salary)} · Comm: {peso(comm)} · LD: {peso(ld)})
+                        </span>
+                      </div>
+                      <span style={{ fontWeight: 700, color: "var(--accent)" }}>
+                        {peso(total)}
+                      </span>
+                    </div>
+
+                    {/* Segmented Stacked Bar */}
+                    <div style={{ width: "100%", height: 12, background: "var(--border)", borderRadius: 6, overflow: "hidden", display: "flex" }}>
+                      <div
+                        style={{
+                          width: `${barWidth}%`,
+                          height: "100%",
+                          display: "flex",
+                          borderRadius: 6,
+                          overflow: "hidden",
+                          transition: "width 0.4s ease",
+                        }}
+                      >
+                        {salary > 0 && (
+                          <div
+                            style={{
+                              width: `${salaryPct}%`,
+                              height: "100%",
+                              background: "#8b5cf6",
+                            }}
+                            title={`Base Salary: ${peso(salary)}`}
+                          />
+                        )}
+                        {comm > 0 && (
+                          <div
+                            style={{
+                              width: `${commPct}%`,
+                              height: "100%",
+                              background: "#38bdf8",
+                            }}
+                            title={`Commissions: ${peso(comm)}`}
+                          />
+                        )}
+                        {ld > 0 && (
+                          <div
+                            style={{
+                              width: `${ldPct}%`,
+                              height: "100%",
+                              background: "#2fcf8a",
+                            }}
+                            title={`LD Commissions: ${peso(ld)}`}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        )}
+      </section>
+
       {/* ── 3. Detailed Reporting Playground (CRUD, Sort Highest-to-Lowest, Filter, Export) ── */}
       <section className="card" style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
@@ -335,6 +506,12 @@ export default function AdminDashboard() {
               onClick={() => setReportTab("products")}
             >
               <Package size={14} /> Product Profitability (Sortable)
+            </button>
+            <button
+              className={`chip ${reportTab === "employees" ? "active" : ""}`}
+              onClick={() => setReportTab("employees")}
+            >
+              <Users size={14} /> Top Employees (Income)
             </button>
             <button
               className={`chip ${reportTab === "shifts" ? "active" : ""}`}
@@ -447,6 +624,46 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* ── Tab: Top Employees Breakdown ── */}
+        {reportTab === "employees" && (
+          <div>
+            {!d.top_employees || d.top_employees.length === 0 ? (
+              <Empty text="No employee earnings recorded in this date range" />
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Rank</th>
+                      <th>Employee Name</th>
+                      <th className="num">Base Salary</th>
+                      <th className="num">Commissions</th>
+                      <th className="num">LD Commissions</th>
+                      <th className="num">Total Earnings</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {d.top_employees.map((emp, idx) => (
+                      <tr key={emp.employee_name} className="row-hover">
+                        <td style={{ fontWeight: 700 }}>
+                          {idx === 0 ? "🥇 1st" : idx === 1 ? "🥈 2nd" : idx === 2 ? "🥉 3rd" : `#${idx + 1}`}
+                        </td>
+                        <td><b>{emp.employee_name}</b></td>
+                        <td className="num">{peso(emp.salary)}</td>
+                        <td className="num" style={{ color: "#38bdf8" }}>{peso(emp.commission)}</td>
+                        <td className="num" style={{ color: "#2fcf8a" }}>{peso(emp.ld_commission)}</td>
+                        <td className="num" style={{ fontWeight: 700, color: "var(--accent)" }}>
+                          {peso(emp.total)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Tab: Shift Audit & Z-Readings ── */}
         {reportTab === "shifts" && (
           <div>
@@ -465,6 +682,9 @@ export default function AdminDashboard() {
                       <th className="num">Opening Float</th>
                       <th className="num">Cash Sales</th>
                       <th className="num">Expenses</th>
+                      <th className="num">Salaries</th>
+                      <th className="num">Commissions</th>
+                      <th className="num">LD Comm</th>
                       <th className="num">Expected</th>
                       <th className="num">Closing Cash</th>
                       <th className="num">Variance</th>
@@ -487,6 +707,9 @@ export default function AdminDashboard() {
                           <td className="num">{peso(s.opening_cash)}</td>
                           <td className="num" style={{ color: "var(--ok)" }}>+{peso(s.cash_sales)}</td>
                           <td className="num" style={{ color: "var(--bad)" }}>-{peso(s.expenses)}</td>
+                          <td className="num" style={{ color: "var(--bad)" }}>-{peso(s.salaries || 0)}</td>
+                          <td className="num" style={{ color: "var(--bad)" }}>-{peso(s.commissions || 0)}</td>
+                          <td className="num" style={{ color: "var(--bad)" }}>-{peso(s.ld_commissions || 0)}</td>
                           <td className="num" style={{ fontWeight: 600 }}>{peso(s.expected_cash)}</td>
                           <td className="num" style={{ fontWeight: 600 }}>{isClosed ? peso(s.closing_cash) : "—"}</td>
                           <td className="num">
@@ -595,12 +818,24 @@ export default function AdminDashboard() {
                   <td style={{ textAlign: "right", fontWeight: "bold" }}>{peso(selectedShift.opening_cash)}</td>
                 </tr>
                 <tr>
-                  <td>+ Total Cash Sales Today</td>
+                  <td>+ Total Cash Sales</td>
                   <td style={{ textAlign: "right", fontWeight: "bold", color: "green" }}>+{peso(selectedShift.cash_sales)}</td>
                 </tr>
                 <tr>
-                  <td>- Total Cash Expenses Paid</td>
+                  <td>- Store Expenses Paid</td>
                   <td style={{ textAlign: "right", fontWeight: "bold", color: "red" }}>-{peso(selectedShift.expenses)}</td>
+                </tr>
+                <tr>
+                  <td>- Salaries Paid</td>
+                  <td style={{ textAlign: "right", fontWeight: "bold", color: "red" }}>-{peso(selectedShift.salaries || 0)}</td>
+                </tr>
+                <tr>
+                  <td>- Commissions Paid</td>
+                  <td style={{ textAlign: "right", fontWeight: "bold", color: "red" }}>-{peso(selectedShift.commissions || 0)}</td>
+                </tr>
+                <tr>
+                  <td>- LD Commissions Paid</td>
+                  <td style={{ textAlign: "right", fontWeight: "bold", color: "red" }}>-{peso(selectedShift.ld_commissions || 0)}</td>
                 </tr>
                 <tr style={{ borderTop: "2px solid #333", background: "#f8f8f8" }}>
                   <td><b>Expected Drawer Balance</b></td>

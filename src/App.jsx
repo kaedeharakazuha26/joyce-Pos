@@ -595,7 +595,11 @@ export default function App() {
               const openCash = Number(shift.opening_cash || 0);
               const cashSales = Number(shift.cash_sales || 0);
               const expenses = Number(shift.expenses || 0);
-              const expected = openCash + cashSales - expenses;
+              const salaries = Number(shift.salaries || 0);
+              const commissions = Number(shift.commissions || 0);
+              const ldCommissions = Number(shift.ld_commissions || 0);
+              const totalOutflows = expenses + salaries + commissions + ldCommissions;
+              const expected = openCash + cashSales - totalOutflows;
               const actual = eodForm.closingCash !== "" ? Number(eodForm.closingCash) : null;
               const variance = actual !== null ? actual - expected : null;
 
@@ -640,13 +644,31 @@ export default function App() {
                         <b>{peso(openCash)}</b>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-                        <span>+ Total Cash Sales Today</span>
+                        <span>+ Total Cash Sales</span>
                         <b style={{ color: "var(--ok)" }}>+{peso(cashSales)}</b>
                       </div>
                       <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-                        <span>- Total Cash Expenses Today</span>
+                        <span>- Store Expenses Paid</span>
                         <b style={{ color: "var(--bad)" }}>-{peso(expenses)}</b>
                       </div>
+                      {salaries > 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+                          <span>- Salaries Paid</span>
+                          <b style={{ color: "var(--bad)" }}>-{peso(salaries)}</b>
+                        </div>
+                      )}
+                      {commissions > 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+                          <span>- Commissions Paid</span>
+                          <b style={{ color: "var(--bad)" }}>-{peso(commissions)}</b>
+                        </div>
+                      )}
+                      {ldCommissions > 0 && (
+                        <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+                          <span>- LD Commissions Paid</span>
+                          <b style={{ color: "var(--bad)" }}>-{peso(ldCommissions)}</b>
+                        </div>
+                      )}
                       <div
                         style={{
                           display: "flex",

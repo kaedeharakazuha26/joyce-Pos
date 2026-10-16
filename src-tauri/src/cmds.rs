@@ -152,13 +152,14 @@ pub fn create_sale(db: State<Db>, items: Vec<Value>, paid: f64) -> R<Value> {
     if items.is_empty() {
         return Err("Cart is empty".into());
     }
-    let (biz_date, receipt_prefix) = match get_active_shift(&tx) {
-        Some((_, bdate)) => {
+    let (shift_id, biz_date, receipt_prefix) = match get_active_shift(&tx) {
+        Some((sid, bdate)) => {
             let clean = bdate.replace("-", "");
-            (bdate, clean)
+            (Some(sid), bdate, clean)
         }
         None => {
             (
+                None,
                 chrono::Local::now().format("%Y-%m-%d").to_string(),
                 chrono::Local::now().format("%Y%m%d").to_string(),
             )
@@ -170,8 +171,8 @@ pub fn create_sale(db: State<Db>, items: Vec<Value>, paid: f64) -> R<Value> {
     let receipt = format!("JP-{}-{:04}", receipt_prefix, n + 1);
     let created_at = format!("{} {}", biz_date, chrono::Local::now().format("%H:%M:%S"));
     tx.execute(
-        "INSERT INTO sales(receipt_no,total,paid,change_amt,status,created_at) VALUES(?,0,0,0,'completed',?)",
-        params![receipt, created_at],
+        "INSERT INTO sales(receipt_no,total,paid,change_amt,status,created_at,shift_id) VALUES(?,0,0,0,'completed',?,?)",
+        params![receipt, created_at, shift_id],
     )
     .map_err(e)?;
     let sid = tx.last_insert_rowid();
@@ -316,10 +317,11 @@ pub fn save_expense(db: State<Db>, expense: Value) -> R<()> {
     }
     let raw_date = text(&expense, "date");
     let date = if raw_date.is_empty() { active_business_date(&c) } else { raw_date };
+    let shift_id = get_active_shift(&c).map(|(sid, _)| sid);
     let (cat, desc, amt) = (text(&expense, "category"), text(&expense, "description"), num(&expense, "amount"));
     match expense.get("id").and_then(|x| x.as_i64()) {
         Some(id) => c.execute("UPDATE expenses SET category=?,description=?,amount=?,date=? WHERE id=?", params![cat, desc, amt, date, id]),
-        None => c.execute("INSERT INTO expenses(category,description,amount,date) VALUES(?,?,?,?)", params![cat, desc, amt, date]),
+        None => c.execute("INSERT INTO expenses(category,description,amount,date,shift_id) VALUES(?,?,?,?,?)", params![cat, desc, amt, date, shift_id]),
     }
     .map_err(e)?;
     Ok(())
@@ -346,14 +348,15 @@ pub fn save_salary(db: State<Db>, salary: Value) -> R<()> {
     }
     let raw_date = text(&salary, "date");
     let date = if raw_date.is_empty() { active_business_date(&c) } else { raw_date };
+    let shift_id = get_active_shift(&c).map(|(sid, _)| sid);
     match salary.get("id").and_then(|x| x.as_i64()) {
         Some(id) => c.execute(
             "UPDATE salaries SET employee=?,amount=?,period=?,date=?,note=? WHERE id=?",
             params![text(&salary, "employee"), num(&salary, "amount"), text(&salary, "period"), date, text(&salary, "note"), id],
         ),
         None => c.execute(
-            "INSERT INTO salaries(employee,amount,period,date,note) VALUES(?,?,?,?,?)",
-            params![text(&salary, "employee"), num(&salary, "amount"), text(&salary, "period"), date, text(&salary, "note")],
+            "INSERT INTO salaries(employee,amount,period,date,note,shift_id) VALUES(?,?,?,?,?,?)",
+            params![text(&salary, "employee"), num(&salary, "amount"), text(&salary, "period"), date, text(&salary, "note"), shift_id],
         ),
     }
     .map_err(e)?;
@@ -396,9 +399,10 @@ pub fn list_commissions(db: State<Db>, from: String, to: String) -> R<Vec<Value>
 pub fn save_commission(db: State<Db>, commission: Value) -> R<()> {
     let c = db.0.lock().map_err(e)?;
     let (date, eid, name, ty, amt) = comm_args(&c, &commission, true)?;
+    let shift_id = get_active_shift(&c).map(|(sid, _)| sid);
     match commission.get("id").and_then(|x| x.as_i64()) {
         Some(id) => c.execute("UPDATE commissions SET date=?,employee_id=?,employee_name=?,type=?,amount=? WHERE id=?", params![date, eid, name, ty, amt, id]),
-        None => c.execute("INSERT INTO commissions(date,employee_id,employee_name,type,amount) VALUES(?,?,?,?,?)", params![date, eid, name, ty, amt]),
+        None => c.execute("INSERT INTO commissions(date,employee_id,employee_name,type,amount,shift_id) VALUES(?,?,?,?,?,?)", params![date, eid, name, ty, amt, shift_id]),
     }
     .map_err(e)?;
     Ok(())
@@ -438,6 +442,7 @@ pub fn list_ld_commissions(db: State<Db>, from: String, to: String) -> R<Vec<Val
 pub fn save_ld_commission(db: State<Db>, commission: Value) -> R<()> {
     let c = db.0.lock().map_err(e)?;
     let (date, eid, name, _, amt) = comm_args(&c, &commission, false)?;
+    let shift_id = get_active_shift(&c).map(|(sid, _)| sid);
     let qty = commission.get("quantity").and_then(|x| x.as_i64()).unwrap_or(1).max(1);
     match commission.get("id").and_then(|x| x.as_i64()) {
         Some(id) => c.execute(
@@ -445,8 +450,8 @@ pub fn save_ld_commission(db: State<Db>, commission: Value) -> R<()> {
             params![date, eid, name, qty, amt, id],
         ),
         None => c.execute(
-            "INSERT INTO ld_commissions(date,employee_id,employee_name,quantity,amount) VALUES(?,?,?,?,?)",
-            params![date, eid, name, qty, amt],
+            "INSERT INTO ld_commissions(date,employee_id,employee_name,quantity,amount,shift_id) VALUES(?,?,?,?,?,?)",
+            params![date, eid, name, qty, amt, shift_id],
         ),
     }
     .map_err(e)?;
@@ -676,6 +681,30 @@ pub fn admin_dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
         p,
     )?;
 
+    // Top performing employees
+    let top_employees = rows(
+        &c,
+        r#"
+        SELECT employee_name,
+               ROUND(SUM(amount), 2) AS total,
+               ROUND(SUM(CASE WHEN src='salary' THEN amount ELSE 0 END), 2) AS salary,
+               ROUND(SUM(CASE WHEN src='commission' THEN amount ELSE 0 END), 2) AS commission,
+               ROUND(SUM(CASE WHEN src='ld' THEN amount ELSE 0 END), 2) AS ld_commission
+        FROM (
+            SELECT employee AS employee_name, amount, 'salary' AS src FROM salaries WHERE date BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT employee_name, amount, 'commission' AS src FROM commissions WHERE date BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT employee_name, amount, 'ld' AS src FROM ld_commissions WHERE date BETWEEN ?1 AND ?2
+        )
+        WHERE employee_name != ''
+        GROUP BY employee_name
+        ORDER BY total DESC
+        LIMIT 10
+        "#,
+        p,
+    )?;
+
     // Shift audit history
     let shift_history = rows(
         &c,
@@ -707,7 +736,8 @@ pub fn admin_dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
         "categories": categories,
         "product_performance": product_performance,
         "expense_categories": expense_categories,
-        "shift_history": shift_history
+        "shift_history": shift_history,
+        "top_employees": top_employees
     }))
 }
 
@@ -734,27 +764,56 @@ pub fn get_shift_status(db: State<Db>) -> R<Value> {
 
     match active {
         Some(mut shift) => {
-            let biz_date = shift["business_date"].as_str().unwrap_or("").to_string();
+            let shift_id = shift["id"].as_i64().unwrap_or(0);
+            let opened_at = shift["opened_at"].as_str().unwrap_or("").to_string();
+
+            // Cash sales: strictly scoped to this shift by shift_id or timestamp after opened_at
             let cash_sales: f64 = c.query_row(
-                "SELECT COALESCE(SUM(total), 0) FROM sales WHERE status='completed' AND date(created_at)=?1",
-                [&biz_date],
+                "SELECT COALESCE(SUM(total), 0) FROM sales WHERE status='completed' AND (shift_id = ?1 OR (shift_id IS NULL AND created_at >= ?2))",
+                params![shift_id, opened_at],
                 |r| r.get(0)
             ).unwrap_or(0.0);
+
             let expenses: f64 = c.query_row(
-                "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE date=?1",
-                [&biz_date],
+                "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE shift_id = ?1",
+                params![shift_id],
                 |r| r.get(0)
             ).unwrap_or(0.0);
+
+            let salaries: f64 = c.query_row(
+                "SELECT COALESCE(SUM(amount), 0) FROM salaries WHERE shift_id = ?1",
+                params![shift_id],
+                |r| r.get(0)
+            ).unwrap_or(0.0);
+
+            let commissions: f64 = c.query_row(
+                "SELECT COALESCE(SUM(amount), 0) FROM commissions WHERE shift_id = ?1",
+                params![shift_id],
+                |r| r.get(0)
+            ).unwrap_or(0.0);
+
+            let ld_commissions: f64 = c.query_row(
+                "SELECT COALESCE(SUM(amount), 0) FROM ld_commissions WHERE shift_id = ?1",
+                params![shift_id],
+                |r| r.get(0)
+            ).unwrap_or(0.0);
+
             let opening_cash = shift["opening_cash"].as_f64().unwrap_or(0.0);
-            let expected_cash = opening_cash + cash_sales - expenses;
+            let total_outflows = expenses + salaries + commissions + ld_commissions;
+            let expected_cash = opening_cash + cash_sales - total_outflows;
+
             shift["cash_sales"] = json!(r2(cash_sales));
             shift["expenses"] = json!(r2(expenses));
+            shift["salaries"] = json!(r2(salaries));
+            shift["commissions"] = json!(r2(commissions));
+            shift["ld_commissions"] = json!(r2(ld_commissions));
+            shift["total_outflows"] = json!(r2(total_outflows));
             shift["expected_cash"] = json!(r2(expected_cash));
             Ok(json!({ "is_open": true, "shift": shift }))
         }
         None => {
             let last = c.query_row(
-                "SELECT id, business_date, status, closed_at, closing_cash, expected_cash, cash_sales, expenses FROM shifts WHERE status='closed' ORDER BY id DESC LIMIT 1",
+                "SELECT id, business_date, status, closed_at, closing_cash, expected_cash, cash_sales, expenses, salaries, commissions, ld_commissions FROM shifts WHERE status='closed' ORDER BY id DESC LIMIT 1",
                 [],
                 |r| {
                     Ok(json!({
@@ -766,6 +825,9 @@ pub fn get_shift_status(db: State<Db>) -> R<Value> {
                         "expected_cash": r.get::<_, f64>(5)?,
                         "cash_sales": r.get::<_, f64>(6)?,
                         "expenses": r.get::<_, f64>(7)?,
+                        "salaries": r.get::<_, f64>(8).unwrap_or(0.0),
+                        "commissions": r.get::<_, f64>(9).unwrap_or(0.0),
+                        "ld_commissions": r.get::<_, f64>(10).unwrap_or(0.0),
                     }))
                 }
             ).optional().map_err(e)?;
@@ -799,32 +861,53 @@ pub fn start_day(db: State<Db>, business_date: String, opened_by: String, openin
 pub fn end_day(db: State<Db>, closing_cash: f64, closed_by: String, notes: String) -> R<Value> {
     let c = db.0.lock().map_err(e)?;
     let active = c.query_row(
-        "SELECT id, business_date, opening_cash FROM shifts WHERE status='open' ORDER BY id DESC LIMIT 1",
+        "SELECT id, business_date, opening_cash, opened_at FROM shifts WHERE status='open' ORDER BY id DESC LIMIT 1",
         [],
-        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, f64>(2)?)),
+        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, f64>(2)?, r.get::<_, String>(3)?)),
     ).map_err(|_| "No open business day shift found.".to_string())?;
 
-    let (shift_id, biz_date, opening_cash) = active;
+    let (shift_id, biz_date, opening_cash, opened_at) = active;
     let cash_sales: f64 = c.query_row(
-        "SELECT COALESCE(SUM(total), 0) FROM sales WHERE status='completed' AND date(created_at)=?1",
-        [&biz_date],
+        "SELECT COALESCE(SUM(total), 0) FROM sales WHERE status='completed' AND (shift_id = ?1 OR (shift_id IS NULL AND created_at >= ?2))",
+        params![shift_id, opened_at],
         |r| r.get(0)
     ).unwrap_or(0.0);
+
     let expenses: f64 = c.query_row(
-        "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE date=?1",
-        [&biz_date],
+        "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE shift_id = ?1",
+        params![shift_id],
         |r| r.get(0)
     ).unwrap_or(0.0);
-    let expected_cash = opening_cash + cash_sales - expenses;
+
+    let salaries: f64 = c.query_row(
+        "SELECT COALESCE(SUM(amount), 0) FROM salaries WHERE shift_id = ?1",
+        params![shift_id],
+        |r| r.get(0)
+    ).unwrap_or(0.0);
+
+    let commissions: f64 = c.query_row(
+        "SELECT COALESCE(SUM(amount), 0) FROM commissions WHERE shift_id = ?1",
+        params![shift_id],
+        |r| r.get(0)
+    ).unwrap_or(0.0);
+
+    let ld_commissions: f64 = c.query_row(
+        "SELECT COALESCE(SUM(amount), 0) FROM ld_commissions WHERE shift_id = ?1",
+        params![shift_id],
+        |r| r.get(0)
+    ).unwrap_or(0.0);
+
+    let total_outflows = expenses + salaries + commissions + ld_commissions;
+    let expected_cash = opening_cash + cash_sales - total_outflows;
     let closed_at = now();
 
     c.execute(
         r#"
         UPDATE shifts
-        SET status='closed', closed_by=?, closed_at=?, closing_cash=?, expected_cash=?, cash_sales=?, expenses=?, notes=CASE WHEN ? != '' THEN ? ELSE notes END
+        SET status='closed', closed_by=?, closed_at=?, closing_cash=?, expected_cash=?, cash_sales=?, expenses=?, salaries=?, commissions=?, ld_commissions=?, notes=CASE WHEN ? != '' THEN ? ELSE notes END
         WHERE id=?
         "#,
-        params![closed_by, closed_at, closing_cash, expected_cash, cash_sales, expenses, notes, notes, shift_id],
+        params![closed_by, closed_at, closing_cash, expected_cash, cash_sales, expenses, salaries, commissions, ld_commissions, notes, notes, shift_id],
     ).map_err(e)?;
 
     Ok(json!({
@@ -833,6 +916,10 @@ pub fn end_day(db: State<Db>, closing_cash: f64, closed_by: String, notes: Strin
         "opening_cash": r2(opening_cash),
         "cash_sales": r2(cash_sales),
         "expenses": r2(expenses),
+        "salaries": r2(salaries),
+        "commissions": r2(commissions),
+        "ld_commissions": r2(ld_commissions),
+        "total_outflows": r2(total_outflows),
         "expected_cash": r2(expected_cash),
         "closing_cash": r2(closing_cash),
         "variance": r2(closing_cash - expected_cash),

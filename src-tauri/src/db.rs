@@ -276,6 +276,9 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             expected_cash REAL NOT NULL DEFAULT 0,
             cash_sales REAL NOT NULL DEFAULT 0,
             expenses REAL NOT NULL DEFAULT 0,
+            salaries REAL NOT NULL DEFAULT 0,
+            commissions REAL NOT NULL DEFAULT 0,
+            ld_commissions REAL NOT NULL DEFAULT 0,
             notes TEXT NOT NULL DEFAULT ''
         );
 
@@ -292,6 +295,16 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
     let _ = conn.execute("ALTER TABLE sales ADD COLUMN voided_by TEXT NOT NULL DEFAULT ''", []);
     let _ = conn.execute("ALTER TABLE voided_sales ADD COLUMN voided_by TEXT NOT NULL DEFAULT ''", []);
     let _ = conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('admin_pin', '0000')", []);
+
+    // Shift breakdown migrations
+    let _ = conn.execute("ALTER TABLE shifts ADD COLUMN salaries REAL NOT NULL DEFAULT 0", []);
+    let _ = conn.execute("ALTER TABLE shifts ADD COLUMN commissions REAL NOT NULL DEFAULT 0", []);
+    let _ = conn.execute("ALTER TABLE shifts ADD COLUMN ld_commissions REAL NOT NULL DEFAULT 0", []);
+    let _ = conn.execute("ALTER TABLE sales ADD COLUMN shift_id INTEGER DEFAULT NULL", []);
+    let _ = conn.execute("ALTER TABLE expenses ADD COLUMN shift_id INTEGER DEFAULT NULL", []);
+    let _ = conn.execute("ALTER TABLE salaries ADD COLUMN shift_id INTEGER DEFAULT NULL", []);
+    let _ = conn.execute("ALTER TABLE commissions ADD COLUMN shift_id INTEGER DEFAULT NULL", []);
+    let _ = conn.execute("ALTER TABLE ld_commissions ADD COLUMN shift_id INTEGER DEFAULT NULL", []);
 
     Ok(())
 }
