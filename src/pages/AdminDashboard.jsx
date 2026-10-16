@@ -24,6 +24,7 @@ import {
   AlertCircle,
   HelpCircle,
   Store,
+  Users,
 } from "lucide-react";
 import { api } from "../api";
 import { PageHeader, RangeBar, Empty, Modal, useToast } from "../components/ui";
