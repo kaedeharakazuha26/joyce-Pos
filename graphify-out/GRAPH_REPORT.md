@@ -1,7 +1,7 @@
 # Graph Report - Joy-Pos-Multiplatform  (2026-10-17)
 
 ## Corpus Check
-- 30 files · ~109,036 words
+- 30 files · ~109,037 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .icns 1, .ico 1)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ecbfb784`
+- Built from commit: `e1bd79f2`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -46,16 +46,16 @@
 10. `Field()` - 19 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `send_usb()` --calls--> `e()`  [INFERRED]
-  src-tauri/src/printer.rs → src-tauri/src/cmds.rs
-- `list_products()` --references--> `Db`  [EXTRACTED]
-  src-tauri/src/cmds.rs → src-tauri/src/db.rs
-- `save_product()` --references--> `Db`  [EXTRACTED]
-  src-tauri/src/cmds.rs → src-tauri/src/db.rs
-- `create_sale()` --references--> `Db`  [EXTRACTED]
-  src-tauri/src/cmds.rs → src-tauri/src/db.rs
-- `list_sales()` --references--> `Db`  [EXTRACTED]
-  src-tauri/src/cmds.rs → src-tauri/src/db.rs
+- `AdminDashboard()` --calls--> `useSettings()`  [EXTRACTED]
+  src/pages/AdminDashboard.jsx → src/App.jsx
+- `AdminDashboard()` --calls--> `Empty()`  [EXTRACTED]
+  src/pages/AdminDashboard.jsx → src/components/ui.jsx
+- `AdminDashboard()` --calls--> `Modal()`  [EXTRACTED]
+  src/pages/AdminDashboard.jsx → src/components/ui.jsx
+- `AdminDashboard()` --calls--> `PageHeader()`  [EXTRACTED]
+  src/pages/AdminDashboard.jsx → src/components/ui.jsx
+- `AdminDashboard()` --calls--> `Receipt()`  [EXTRACTED]
+  src/pages/AdminDashboard.jsx → src/components/ui.jsx
 
 ## Import Cycles
 - 2-file cycle: `src-tauri/src/cmds.rs -> src-tauri/src/printer.rs -> src-tauri/src/cmds.rs`
