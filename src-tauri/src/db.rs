@@ -98,6 +98,17 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             note TEXT NOT NULL DEFAULT ''
         );
 
+        CREATE TABLE IF NOT EXISTS employees(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            position TEXT NOT NULL DEFAULT '',
+            commission REAL NOT NULL DEFAULT 0,     -- flat amount (PHP)
+            ld_commission REAL NOT NULL DEFAULT 0,  -- LD (load) flat amount (PHP)
+            salary REAL NOT NULL DEFAULT 0,
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS settings(
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL

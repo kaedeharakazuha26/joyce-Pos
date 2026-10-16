@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { LayoutDashboard, ShoppingCart, History, Package, Boxes, Receipt as ReceiptIcon, Wallet, Settings as Cog } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, History, Package, Boxes, Receipt as ReceiptIcon, Wallet, Users, Settings as Cog } from "lucide-react";
 import { ToastProvider } from "./components/ui";
 import { api } from "./api";
 import Dashboard from "./pages/Dashboard";
@@ -9,9 +9,10 @@ import Products from "./pages/Products";
 import Inventory from "./pages/Inventory";
 import Expenses from "./pages/Expenses";
 import Salary from "./pages/Salary";
+import Employees from "./pages/Employees";
 import Settings from "./pages/Settings";
 
-const SettingsCtx = createContext({ settings: {}, save: async () => {} });
+const SettingsCtx = createContext({ settings: {}, save: async () => { } });
 export const useSettings = () => useContext(SettingsCtx);
 
 const NAV = [
@@ -22,6 +23,7 @@ const NAV = [
   { id: "inventory", label: "Inventory", icon: Boxes, page: Inventory },
   { id: "expenses", label: "Expenses", icon: ReceiptIcon, page: Expenses },
   { id: "salary", label: "Salary", icon: Wallet, page: Salary },
+  { id: "employees", label: "Employees", icon: Users, page: Employees },
   { id: "settings", label: "Settings", icon: Cog, page: Settings },
 ];
 
@@ -36,7 +38,7 @@ export default function App() {
 
   useEffect(() => {
     applyTheme(localStorage.getItem("joyce-theme") || "dark");
-    api.getSettings().then((s) => { setSettings(s); if (s.theme) applyTheme(s.theme); }).catch(() => {});
+    api.getSettings().then((s) => { setSettings(s); if (s.theme) applyTheme(s.theme); }).catch(() => { });
   }, []);
 
   const save = useCallback(async (values) => {
@@ -54,7 +56,7 @@ export default function App() {
           <aside className="sidebar">
             <div className="brand">
               <img src="/logo.png" alt="JOYCE POS logo" />
-              <div><b>JOYCE POS</b><small>Sari-sari store</small></div>
+              <div><b>JOYCE POS</b><small></small></div>
             </div>
             {NAV.map(({ id, label, icon: Icon }) => (
               <button key={id} id={`nav-${id}`} className={"nav-btn" + (tab === id ? " active" : "")} onClick={() => setTab(id)}>

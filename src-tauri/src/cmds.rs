@@ -330,6 +330,43 @@ pub fn delete_salary(db: State<Db>, id: i64) -> R<()> {
     Ok(())
 }
 
+// ───────────────────────── Employees ─────────────────────────
+
+#[tauri::command]
+pub fn list_employees(db: State<Db>) -> R<Vec<Value>> {
+    let c = db.0.lock().map_err(e)?;
+    rows(&c, "SELECT * FROM employees WHERE active=1 ORDER BY name COLLATE NOCASE", &[])
+}
+
+#[tauri::command]
+pub fn save_employee(db: State<Db>, employee: Value) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    let name = text(&employee, "name");
+    if name.is_empty() {
+        return Err("Employee name is required".into());
+    }
+    let (pos, com, ld, sal) = (text(&employee, "position"), num(&employee, "commission"), num(&employee, "ld_commission"), num(&employee, "salary"));
+    match employee.get("id").and_then(|x| x.as_i64()) {
+        Some(id) => c.execute(
+            "UPDATE employees SET name=?,position=?,commission=?,ld_commission=?,salary=? WHERE id=?",
+            params![name, pos, com, ld, sal, id],
+        ),
+        None => c.execute(
+            "INSERT INTO employees(name,position,commission,ld_commission,salary,created_at) VALUES(?,?,?,?,?,?)",
+            params![name, pos, com, ld, sal, now()],
+        ),
+    }
+    .map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_employee(db: State<Db>, id: i64) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    c.execute("UPDATE employees SET active=0 WHERE id=?", [id]).map_err(e)?;
+    Ok(())
+}
+
 // ───────────────────────── Dashboard ─────────────────────────
 
 #[tauri::command]
