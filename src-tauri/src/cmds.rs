@@ -712,6 +712,41 @@ pub fn admin_dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
         p,
     )?;
 
+    // Daily sales vs overheads trend
+    let daily = rows(
+        &c,
+        r#"
+        SELECT day,
+               ROUND(SUM(sales), 2) AS total,
+               SUM(order_count) AS count,
+               ROUND(SUM(expenses), 2) AS expenses,
+               ROUND(SUM(salaries), 2) AS salaries,
+               ROUND(SUM(commissions), 2) AS commissions,
+               ROUND(SUM(ld_commissions), 2) AS ld_commissions,
+               ROUND(SUM(sales - expenses - salaries - commissions - ld_commissions), 2) AS net
+        FROM (
+            SELECT date(created_at) AS day, total AS sales, 1 AS order_count, 0.0 AS expenses, 0.0 AS salaries, 0.0 AS commissions, 0.0 AS ld_commissions
+            FROM sales WHERE status='completed' AND date(created_at) BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT date AS day, 0.0 AS sales, 0 AS order_count, amount AS expenses, 0.0 AS salaries, 0.0 AS commissions, 0.0 AS ld_commissions
+            FROM expenses WHERE date BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT date AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, amount AS salaries, 0.0 AS commissions, 0.0 AS ld_commissions
+            FROM salaries WHERE date BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT date AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, amount AS commissions, 0.0 AS ld_commissions
+            FROM commissions WHERE date BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT date AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, 0.0 AS commissions, amount AS ld_commissions
+            FROM ld_commissions WHERE date BETWEEN ?1 AND ?2
+        )
+        WHERE day IS NOT NULL AND day != ''
+        GROUP BY day
+        ORDER BY day ASC
+        "#,
+        p,
+    )?;
+
     Ok(json!({
         "revenue": r2(revenue),
         "orders": count,
@@ -737,7 +772,8 @@ pub fn admin_dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
         "product_performance": product_performance,
         "expense_categories": expense_categories,
         "shift_history": shift_history,
-        "top_employees": top_employees
+        "top_employees": top_employees,
+        "daily": daily
     }))
 }
 
@@ -1032,6 +1068,12 @@ pub fn reset_db(db: State<Db>, pin: String, keep_catalog: bool) -> R<String> {
     };
 
     Ok(format!("Database for branch '{}' has been reset successfully.", branch_name))
+}
+
+#[tauri::command]
+pub fn save_text_file(path: String, content: String) -> R<()> {
+    std::fs::write(&path, content).map_err(e)?;
+    Ok(())
 }
 
 // ───────────────────────── Printing ─────────────────────────

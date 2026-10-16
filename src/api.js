@@ -46,6 +46,7 @@ export const api = {
   backup: (path) => call("backup_db", { path }),
   restore: (path) => call("restore_db", { path }),
   resetDb: (pin, keepCatalog = true) => call("reset_db", { pin, keepCatalog }),
+  saveTextFile: (path, content) => call("save_text_file", { path, content }),
   printReceipt: (saleId) => call("print_receipt", { saleId }),
   printTest: () => call("print_test"),
   usbDevices: () => call("list_usb_devices"),

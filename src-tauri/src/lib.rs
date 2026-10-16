@@ -57,6 +57,7 @@ pub fn run() {
             cmds::backup_db,
             cmds::restore_db,
             cmds::reset_db,
+            cmds::save_text_file,
             cmds::print_receipt,
             cmds::print_test,
             cmds::list_usb_devices,

@@ -742,19 +742,23 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   #receipt-print, #receipt-print *,
   #printable-employee-report, #printable-employee-report *,
   #printable-eod-report, #printable-eod-report *,
-  #printable-admin-report, #printable-admin-report * {
+  #printable-admin-report, #printable-admin-report *,
+  #printable-admin-employee-report, #printable-admin-employee-report *,
+  #printable-shift-zreading, #printable-shift-zreading * {
     visibility: visible;
   }
   #receipt-print {
     position: absolute; left: 0; top: 0; box-shadow: none; padding: 0;
   }
-  #printable-employee-report, #printable-eod-report, #printable-admin-report {
+  #printable-employee-report, #printable-eod-report, #printable-admin-report, #printable-admin-employee-report, #printable-shift-zreading {
     position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; padding: 24px;
     background: #fff !important; color: #000 !important;
   }
   #printable-employee-report th, #printable-employee-report td,
   #printable-eod-report th, #printable-eod-report td,
-  #printable-admin-report th, #printable-admin-report td {
+  #printable-admin-report th, #printable-admin-report td,
+  #printable-admin-employee-report th, #printable-admin-employee-report td,
+  #printable-shift-zreading th, #printable-shift-zreading td {
     color: #000 !important;
     border-color: #ddd !important;
   }
