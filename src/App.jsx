@@ -99,6 +99,9 @@ export default function App() {
     try {
       const info = await api.switchBranch(branchId);
       setBranchInfo(info);
+      const s = await api.getSettings().catch(() => ({}));
+      setSettings(s);
+      if (s.theme) applyTheme(s.theme);
       setBranchKey((k) => k + 1);
     } catch (e) {
       alert("Failed to switch branch: " + e);
@@ -111,6 +114,9 @@ export default function App() {
     try {
       const info = await api.createBranch(newBranchName.trim());
       setBranchInfo(info);
+      const s = await api.getSettings().catch(() => ({}));
+      setSettings(s);
+      if (s.theme) applyTheme(s.theme);
       setBranchKey((k) => k + 1);
       setShowAddBranch(false);
       setNewBranchName("");
@@ -121,8 +127,21 @@ export default function App() {
     }
   };
 
+  const disabledMenus = settings?.disabled_menus
+    ? (() => {
+        try {
+          return JSON.parse(settings.disabled_menus);
+        } catch {
+          return [];
+        }
+      })()
+    : [];
+
   const allowedNav = NAV.filter((item) => {
     if (!currentUser) return false;
+    if (!["dashboard", "pos", "transactions", "products", "settings"].includes(item.id)) {
+      if (disabledMenus.includes(item.id)) return false;
+    }
     if (currentUser.role === "admin") return true;
     if (Array.isArray(currentUser.permissions)) {
       return currentUser.permissions.includes(item.id);

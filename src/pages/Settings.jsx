@@ -255,6 +255,28 @@ export default function Settings() {
     }
   };
 
+  const toggleBranchMenu = async (menuId) => {
+    let current = [];
+    try {
+      current = s.disabled_menus ? JSON.parse(s.disabled_menus) : [];
+    } catch {
+      current = [];
+    }
+    const next = current.includes(menuId)
+      ? current.filter((m) => m !== menuId)
+      : [...current, menuId];
+    const val = JSON.stringify(next);
+    set("disabled_menus", val);
+    await save({ disabled_menus: val });
+    toast("Branch menu configuration updated");
+  };
+
+  useEffect(() => {
+    if (tab === "printer" && s.printer_conn === "usb") {
+      api.usbDevices().then(setUsb).catch(() => {});
+    }
+  }, [tab, s.printer_conn]);
+
   const submitCreateBranch = async () => {
     if (!newBranchName.trim()) return;
     setCreatingBranch(true);
@@ -449,6 +471,63 @@ export default function Settings() {
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Branch Menu & Reporting Configuration Card */}
+          <div className="card">
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <Store size={18} color="var(--accent)" />
+              <h3 style={{ margin: 0 }}>
+                Sidebar Menus & Reporting for Active Branch:{" "}
+                <span style={{ color: "var(--accent)" }}>
+                  {branchInfo?.branches?.find((b) => b.id === branchInfo?.active_branch)?.name || "Current Branch"}
+                </span>
+              </h3>
+            </div>
+            <p className="muted" style={{ marginBottom: 14, fontSize: 13 }}>
+              Enable or disable specific modules for this branch. Disabled menus are hidden from the sidebar and automatically excluded from Dashboard reports and overhead deductions.
+            </p>
+
+            <div className="perm-grid">
+              {[
+                { id: "expenses", label: "Expenses", desc: "Store expenses logging & deductions" },
+                { id: "salary", label: "Salary", desc: "Employee salary payouts & payroll" },
+                { id: "commission", label: "Commission", desc: "Flat employee commission tracking" },
+                { id: "ld-commission", label: "LD Commission", desc: "Quantity-based load commissions" },
+                { id: "inventory", label: "Inventory", desc: "Stock restock records & history" },
+                { id: "employees", label: "Employees", desc: "Staff directory & pay rates" },
+              ].map((m) => {
+                let disabledList = [];
+                try {
+                  disabledList = s.disabled_menus ? JSON.parse(s.disabled_menus) : [];
+                } catch {
+                  disabledList = [];
+                }
+                const isEnabled = !disabledList.includes(m.id);
+                return (
+                  <label
+                    key={m.id}
+                    className="perm-label"
+                    style={{
+                      borderLeft: isEnabled ? "3px solid var(--ok)" : "3px solid var(--border)",
+                      opacity: isEnabled ? 1 : 0.65,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isEnabled}
+                      onChange={() => toggleBranchMenu(m.id)}
+                    />
+                    <div>
+                      <b>{m.label}</b>
+                      <div className="muted" style={{ fontSize: 11, marginTop: 2 }}>
+                        {m.desc}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           {/* Google Drive Guide Card */}
@@ -738,8 +817,8 @@ export default function Settings() {
                 >
                   <RefreshCw size={14} /> Scan USB devices
                 </button>
-                {usb.length > 0 && (
-                  <Field label="Detected devices">
+                {usb.length > 0 ? (
+                  <Field label="Detected USB Printers (Inserted)">
                     <select
                       value={`${s.usb_vid}:${s.usb_pid}`}
                       onChange={(e) => {
@@ -748,14 +827,27 @@ export default function Settings() {
                         set("usb_pid", p);
                       }}
                     >
-                      <option value=":">Select…</option>
+                      <option value=":">Select inserted printer…</option>
                       {usb.map((d) => (
                         <option key={d.vid + d.pid} value={`${d.vid}:${d.pid}`}>
-                          {d.name} ({d.vid}:{d.pid})
+                          🖨️ {d.name} ({d.vid}:{d.pid})
                         </option>
                       ))}
                     </select>
                   </Field>
+                ) : (
+                  <div
+                    className="muted"
+                    style={{
+                      fontSize: 13,
+                      padding: "10px 14px",
+                      background: "var(--card-solid)",
+                      borderRadius: 10,
+                      border: "1px dashed var(--border)",
+                    }}
+                  >
+                    No USB thermal printer detected. Please connect your receipt printer USB cable to the computer and click "Scan USB devices".
+                  </div>
                 )}
                 <div className="grid2">
                   <Field label="Vendor ID (hex)">
