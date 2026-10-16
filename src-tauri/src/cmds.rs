@@ -588,6 +588,129 @@ pub fn dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
     }))
 }
 
+#[tauri::command]
+pub fn admin_dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
+    let c = db.0.lock().map_err(e)?;
+    let p: &[&dyn ToSql] = &[&from, &to];
+    let range = "status='completed' AND date(created_at) BETWEEN ?1 AND ?2";
+
+    let revenue = scalar(&c, &format!("SELECT COALESCE(SUM(total),0) FROM sales WHERE {range}"), p);
+    let count = scalar(&c, &format!("SELECT COUNT(*) FROM sales WHERE {range}"), p);
+    let cogs = scalar(&c, &format!("SELECT COALESCE(SUM(cost_total),0) FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE {range})"), p);
+    let voided = scalar(&c, "SELECT COALESCE(SUM(total),0) FROM voided_sales WHERE date(voided_at) BETWEEN ?1 AND ?2", p);
+    let voided_n = scalar(&c, "SELECT COUNT(*) FROM voided_sales WHERE date(voided_at) BETWEEN ?1 AND ?2", p);
+    let expenses = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM expenses WHERE date BETWEEN ?1 AND ?2", p);
+    let salaries = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM salaries WHERE date BETWEEN ?1 AND ?2", p);
+    let commissions = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM commissions WHERE date BETWEEN ?1 AND ?2", p);
+    let ld_commissions = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM ld_commissions WHERE date BETWEEN ?1 AND ?2", p);
+
+    let gross = revenue - cogs;
+    let total_overheads = expenses + salaries + commissions + ld_commissions;
+    let net = gross - total_overheads;
+    let gross_margin = if revenue > 0.0 { r2((gross / revenue) * 100.0) } else { 0.0 };
+    let net_margin = if revenue > 0.0 { r2((net / revenue) * 100.0) } else { 0.0 };
+    let avg_ticket = if count > 0.0 { r2(revenue / count) } else { 0.0 };
+    let void_rate = if (revenue + voided) > 0.0 { r2((voided / (revenue + voided)) * 100.0) } else { 0.0 };
+
+    let inv_cost = scalar(&c, "SELECT COALESCE(SUM(stock*cost),0) FROM products WHERE active=1", &[]);
+    let inv_retail = scalar(&c, "SELECT COALESCE(SUM(stock*price),0) FROM products WHERE active=1", &[]);
+
+    // Hourly sales volume
+    let hourly = rows(
+        &c,
+        &format!(
+            "SELECT strftime('%H', created_at) AS hour, COUNT(*) AS count, ROUND(SUM(total), 2) AS revenue FROM sales WHERE {range} GROUP BY hour ORDER BY hour"
+        ),
+        p,
+    )?;
+
+    // Sales by Category
+    let categories = rows(
+        &c,
+        &format!(
+            r#"
+            SELECT COALESCE(NULLIF(p.category, ''), 'General') AS category,
+                   ROUND(SUM(si.subtotal), 2) AS revenue,
+                   SUM(si.quantity * si.units_per) AS units,
+                   ROUND(SUM(si.subtotal - si.cost_total), 2) AS gross_profit
+            FROM sale_items si
+            LEFT JOIN products p ON si.product_id = p.id
+            WHERE si.sale_id IN (SELECT id FROM sales WHERE {range})
+            GROUP BY category
+            ORDER BY revenue DESC
+            "#
+        ),
+        p,
+    )?;
+
+    // Product Profitability & Performance Table
+    let product_performance = rows(
+        &c,
+        &format!(
+            r#"
+            SELECT p.id,
+                   p.name,
+                   COALESCE(NULLIF(p.category, ''), 'General') AS category,
+                   p.stock AS current_stock,
+                   p.cost AS unit_cost,
+                   p.price AS unit_price,
+                   SUM(si.quantity * si.units_per) AS units_sold,
+                   ROUND(SUM(si.subtotal), 2) AS revenue,
+                   ROUND(SUM(si.cost_total), 2) AS cogs,
+                   ROUND(SUM(si.subtotal - si.cost_total), 2) AS gross_profit,
+                   ROUND(CASE WHEN SUM(si.subtotal) > 0 THEN ((SUM(si.subtotal - si.cost_total) / SUM(si.subtotal)) * 100) ELSE 0 END, 1) AS margin_pct
+            FROM sale_items si
+            JOIN products p ON si.product_id = p.id
+            WHERE si.sale_id IN (SELECT id FROM sales WHERE {range})
+            GROUP BY p.id
+            ORDER BY revenue DESC
+            "#
+        ),
+        p,
+    )?;
+
+    // Expense breakdown by category
+    let expense_categories = rows(
+        &c,
+        "SELECT category, ROUND(SUM(amount), 2) AS total, COUNT(*) AS count FROM expenses WHERE date BETWEEN ?1 AND ?2 GROUP BY category ORDER BY total DESC",
+        p,
+    )?;
+
+    // Shift audit history
+    let shift_history = rows(
+        &c,
+        "SELECT * FROM shifts WHERE date(opened_at) BETWEEN ?1 AND ?2 OR date(business_date) BETWEEN ?1 AND ?2 ORDER BY id DESC LIMIT 50",
+        p,
+    )?;
+
+    Ok(json!({
+        "revenue": r2(revenue),
+        "orders": count,
+        "cogs": r2(cogs),
+        "gross_profit": r2(gross),
+        "gross_margin": gross_margin,
+        "total_overheads": r2(total_overheads),
+        "expenses": r2(expenses),
+        "salaries": r2(salaries),
+        "commissions": r2(commissions),
+        "ld_commissions": r2(ld_commissions),
+        "net_profit": r2(net),
+        "net_margin": net_margin,
+        "avg_ticket": avg_ticket,
+        "voided_total": r2(voided),
+        "voided_count": voided_n,
+        "void_rate": void_rate,
+        "inventory_cost": r2(inv_cost),
+        "inventory_retail": r2(inv_retail),
+        "potential_profit": r2(inv_retail - inv_cost),
+        "hourly": hourly,
+        "categories": categories,
+        "product_performance": product_performance,
+        "expense_categories": expense_categories,
+        "shift_history": shift_history
+    }))
+}
+
 // ───────────────────────── Business Shifts (SOD / EOD) ─────────────────────────
 
 #[tauri::command]
@@ -780,6 +903,48 @@ pub fn restore_db(db: State<Db>, path: String) -> R<String> {
         bs.config.branches.iter().find(|b| b.id == bs.config.active_branch).map(|b| b.name.clone()).unwrap_or_else(|| "Selected Branch".into())
     };
     Ok(format!("Database for branch '{}' restored successfully", branch_name))
+}
+
+#[tauri::command]
+pub fn reset_db(db: State<Db>, pin: String, keep_catalog: bool) -> R<String> {
+    let mut c = db.0.lock().map_err(e)?;
+    let pin = pin.trim();
+    if pin.is_empty() {
+        return Err("Admin PIN is required to authorize database reset".into());
+    }
+    let admin_pin: String = c
+        .query_row("SELECT value FROM settings WHERE key='admin_pin'", [], |r| r.get(0))
+        .unwrap_or_else(|_| "0000".to_string());
+    if pin != admin_pin {
+        return Err("Invalid Admin PIN. Database reset was rejected.".into());
+    }
+
+    let tx = c.transaction().map_err(e)?;
+    tx.execute("DELETE FROM sales", []).map_err(e)?;
+    tx.execute("DELETE FROM sale_items", []).map_err(e)?;
+    tx.execute("DELETE FROM voided_sales", []).map_err(e)?;
+    tx.execute("DELETE FROM restocks", []).map_err(e)?;
+    tx.execute("DELETE FROM expenses", []).map_err(e)?;
+    tx.execute("DELETE FROM salaries", []).map_err(e)?;
+    tx.execute("DELETE FROM commissions", []).map_err(e)?;
+    tx.execute("DELETE FROM ld_commissions", []).map_err(e)?;
+    tx.execute("DELETE FROM shifts", []).map_err(e)?;
+
+    if !keep_catalog {
+        tx.execute("DELETE FROM products", []).map_err(e)?;
+        tx.execute("DELETE FROM variants", []).map_err(e)?;
+        tx.execute("DELETE FROM employees", []).map_err(e)?;
+        tx.execute("DELETE FROM cashiers", []).map_err(e)?;
+    }
+
+    tx.commit().map_err(e)?;
+
+    let branch_name = {
+        let bs = db.1.lock().map_err(e)?;
+        bs.config.branches.iter().find(|b| b.id == bs.config.active_branch).map(|b| b.name.clone()).unwrap_or_else(|| "Selected Branch".into())
+    };
+
+    Ok(format!("Database for branch '{}' has been reset successfully.", branch_name))
 }
 
 // ───────────────────────── Printing ─────────────────────────

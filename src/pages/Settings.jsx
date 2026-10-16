@@ -86,6 +86,10 @@ export default function Settings() {
   const [newBranchModal, setNewBranchModal] = useState(false);
   const [newBranchName, setNewBranchName] = useState("");
   const [creatingBranch, setCreatingBranch] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetPin, setResetPin] = useState("");
+  const [keepCatalog, setKeepCatalog] = useState(true);
+  const [resetting, setResetting] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -148,6 +152,24 @@ export default function Settings() {
       toast(typeof msg === "string" ? msg : `Branch '${activeBranch.name}' database restored — reloading…`);
       setTimeout(() => location.reload(), 900);
     });
+
+  const handleResetDatabase = async (e) => {
+    e.preventDefault();
+    if (!resetPin) return toast("Admin PIN is required to authorize database reset", "err");
+    if (!confirm(`Are you absolutely sure you want to RESET ALL DATA for branch [${activeBranch.name}]? This action cannot be undone.`)) return;
+    setResetting(true);
+    try {
+      const msg = await api.resetDb(resetPin, keepCatalog);
+      toast(typeof msg === "string" ? msg : `Branch '${activeBranch.name}' reset successfully`);
+      setShowResetModal(false);
+      setResetPin("");
+      setTimeout(() => location.reload(), 1000);
+    } catch (err) {
+      toast(errText(err), "err");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   const handleChangeAdminPin = async (e) => {
     e.preventDefault();
@@ -391,6 +413,9 @@ export default function Settings() {
               </button>
               <button className="btn ghost" onClick={restore}>
                 <DatabaseZap size={17} /> Restore [{activeBranch.name}]
+              </button>
+              <button className="btn danger" onClick={() => setShowResetModal(true)}>
+                <Trash2 size={17} /> Reset [{activeBranch.name}] Database
               </button>
             </div>
           </div>
@@ -1071,6 +1096,83 @@ export default function Settings() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Authorize Database Reset Modal ── */}
+      {showResetModal && (
+        <Modal
+          title={`Reset Database — ${activeBranch.name}`}
+          onClose={() => {
+            setShowResetModal(false);
+            setResetPin("");
+          }}
+        >
+          <div
+            style={{
+              background: "rgba(255, 84, 112, 0.1)",
+              border: "1px solid rgba(255, 84, 112, 0.35)",
+              borderRadius: 10,
+              padding: 14,
+              marginBottom: 16,
+              fontSize: 13,
+              lineHeight: 1.5,
+            }}
+          >
+            <b style={{ color: "var(--bad)", display: "block", marginBottom: 4 }}>
+              ⚠️ Danger Zone: Authorize Database Reset
+            </b>
+            <p style={{ margin: 0, color: "var(--text)" }}>
+              This will permanently delete all sales, transactions, restocks, expenses, payroll, and shifts for <b>{activeBranch.name}</b>. Other branch databases will not be touched.
+            </p>
+          </div>
+
+          <form onSubmit={handleResetDatabase}>
+            <Field label="Admin PIN Verification">
+              <input
+                autoFocus
+                type="password"
+                value={resetPin}
+                onChange={(e) => setResetPin(e.target.value)}
+                placeholder="Enter Admin PIN to authorize"
+                required
+              />
+            </Field>
+
+            <div style={{ margin: "14px 0", display: "flex", alignItems: "center", gap: 10 }}>
+              <input
+                type="checkbox"
+                id="keep-catalog-check"
+                checked={keepCatalog}
+                onChange={(e) => setKeepCatalog(e.target.checked)}
+                style={{ width: "auto" }}
+              />
+              <label htmlFor="keep-catalog-check" style={{ fontSize: 13, cursor: "pointer", color: "var(--text)" }}>
+                Preserve Product Catalog & Cashiers (Recommended — only clears transactions & logs)
+              </label>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  setShowResetModal(false);
+                  setResetPin("");
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn danger"
+                disabled={resetting || !resetPin}
+                style={{ flex: 1 }}
+              >
+                <Trash2 size={16} /> {resetting ? "Resetting Database…" : `Confirm Reset for [${activeBranch.name}]`}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
     </>
   );

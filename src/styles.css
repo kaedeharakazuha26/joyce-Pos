@@ -741,18 +741,20 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   body * { visibility: hidden; }
   #receipt-print, #receipt-print *,
   #printable-employee-report, #printable-employee-report *,
-  #printable-eod-report, #printable-eod-report * {
+  #printable-eod-report, #printable-eod-report *,
+  #printable-admin-report, #printable-admin-report * {
     visibility: visible;
   }
   #receipt-print {
     position: absolute; left: 0; top: 0; box-shadow: none; padding: 0;
   }
-  #printable-employee-report, #printable-eod-report {
+  #printable-employee-report, #printable-eod-report, #printable-admin-report {
     position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; padding: 24px;
     background: #fff !important; color: #000 !important;
   }
   #printable-employee-report th, #printable-employee-report td,
-  #printable-eod-report th, #printable-eod-report td {
+  #printable-eod-report th, #printable-eod-report td,
+  #printable-admin-report th, #printable-admin-report td {
     color: #000 !important;
     border-color: #ddd !important;
   }
@@ -760,3 +762,84 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
     border-color: #000 !important;
   }
 }
+
+/* ── Shift Gating & Lockdown Styles ── */
+.nav-btn.gated-disabled {
+  opacity: 0.45;
+  cursor: pointer;
+  background: transparent;
+  border: 1px dashed rgba(255, 106, 61, 0.28);
+}
+.nav-btn.gated-disabled:hover {
+  opacity: 0.85;
+  background: rgba(255, 106, 61, 0.08);
+  transform: none;
+}
+.lock-pill {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255, 106, 61, 0.18);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: auto;
+}
+
+.shift-locked-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 65vh;
+  text-align: center;
+  padding: 40px 24px;
+  animation: fade 0.3s ease;
+}
+.shift-locked-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(255, 106, 61, 0.2), rgba(255, 178, 56, 0.15));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  margin-bottom: 22px;
+  box-shadow: 0 12px 30px rgba(255, 106, 61, 0.25);
+}
+.shift-locked-screen h2 {
+  font-size: 26px;
+  font-weight: 800;
+  margin-bottom: 10px;
+}
+.shift-locked-screen p {
+  color: var(--muted);
+  max-width: 520px;
+  line-height: 1.6;
+  font-size: 14px;
+  margin-bottom: 22px;
+}
+.shift-locked-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+.shift-locked-tab-chip {
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+

@@ -34,6 +34,7 @@ export const api = {
   saveEmployee: (employee) => call("save_employee", { employee }),
   deleteEmployee: (id) => call("delete_employee", { id }),
   dashboard: (from, to) => call("dashboard", { from, to }),
+  adminDashboard: (from, to) => call("admin_dashboard", { from, to }),
   getShiftStatus: () => call("get_shift_status"),
   startDay: (businessDate, openedBy, openingCash, notes) =>
     call("start_day", { businessDate, openedBy, openingCash, notes }),
@@ -44,6 +45,7 @@ export const api = {
   setSettings: (values) => call("set_settings", { values }),
   backup: (path) => call("backup_db", { path }),
   restore: (path) => call("restore_db", { path }),
+  resetDb: (pin, keepCatalog = true) => call("reset_db", { pin, keepCatalog }),
   printReceipt: (saleId) => call("print_receipt", { saleId }),
   printTest: () => call("print_test"),
   usbDevices: () => call("list_usb_devices"),

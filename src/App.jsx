@@ -20,10 +20,13 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle2,
+  ShieldCheck,
+  Lock,
 } from "lucide-react";
 import { ToastProvider, Modal, Field } from "./components/ui";
 import { api } from "./api";
 import PinLock from "./components/PinLock";
+import AdminDashboard from "./pages/AdminDashboard";
 import Dashboard from "./pages/Dashboard";
 import POS from "./pages/POS";
 import Transactions from "./pages/Transactions";
@@ -51,7 +54,10 @@ const SettingsCtx = createContext({
 });
 export const useSettings = () => useContext(SettingsCtx);
 
+const GATED_SHIFT_TABS = ["pos", "expenses", "commission", "ld-commission", "salary"];
+
 const NAV = [
+  { id: "admin-dashboard", label: "Admin Dashboard", icon: ShieldCheck, page: AdminDashboard, adminOnly: true },
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, page: Dashboard },
   { id: "pos", label: "POS", icon: ShoppingCart, page: POS },
   { id: "transactions", label: "Transactions", icon: History, page: Transactions },
@@ -249,7 +255,11 @@ export default function App() {
 
   const allowedNav = NAV.filter((item) => {
     if (!currentUser) return false;
-    if (!["dashboard", "pos", "transactions", "products", "settings"].includes(item.id)) {
+    // Admin dashboard and admin-only tabs are strictly restricted to role === "admin"
+    if (item.adminOnly && currentUser.role !== "admin") return false;
+
+    // Per-branch disabled menus (core system tabs are protected)
+    if (!["admin-dashboard", "dashboard", "pos", "transactions", "products", "settings"].includes(item.id)) {
       if (disabledMenus.includes(item.id)) return false;
     }
     if (currentUser.role === "admin") return true;
@@ -382,16 +392,41 @@ export default function App() {
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, overflowY: "auto" }}>
-                {allowedNav.map(({ id, label, icon: Icon }) => (
-                  <button
-                    key={id}
-                    id={`nav-${id}`}
-                    className={"nav-btn" + (tab === id ? " active" : "")}
-                    onClick={() => setTab(id)}
-                  >
-                    <Icon size={19} /> {label}
-                  </button>
-                ))}
+                {allowedNav.map(({ id, label, icon: Icon }) => {
+                  const isGated = GATED_SHIFT_TABS.includes(id) && !shiftStatus?.is_open;
+                  return (
+                    <button
+                      key={id}
+                      id={`nav-${id}`}
+                      className={
+                        "nav-btn" +
+                        (tab === id ? " active" : "") +
+                        (isGated ? " gated-disabled" : "")
+                      }
+                      onClick={() => {
+                        if (isGated) {
+                          setShowSodModal(true);
+                        } else {
+                          setTab(id);
+                        }
+                      }}
+                      title={
+                        isGated
+                          ? "Business day is closed. Click to Start Day (SOD) to enable."
+                          : label
+                      }
+                    >
+                      <Icon size={19} />
+                      <span style={{ flex: 1 }}>{label}</span>
+                      {isGated && (
+                        <span className="lock-pill" title="Requires active business shift">
+                          <Lock size={10} style={{ display: "inline", verticalAlign: "-1px", marginRight: 3 }} />
+                          SOD
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
               <div className="sidebar-footer">
                 <div className="user-profile">
@@ -411,8 +446,54 @@ export default function App() {
                 </div>
               </div>
             </aside>
-            <main className={"main" + (tab === "pos" ? " pos-main" : "")} key={`${tab}-${branchKey}`}>
-              {Page ? <Page /> : <div className="empty">No access to this section.</div>}
+            <main
+              className={"main" + (tab === "pos" && shiftStatus?.is_open ? " pos-main" : "")}
+              key={`${tab}-${branchKey}`}
+            >
+              {GATED_SHIFT_TABS.includes(tab) && !shiftStatus?.is_open ? (
+                <div className="shift-locked-screen">
+                  <div className="shift-locked-icon">
+                    <Sunrise size={42} />
+                  </div>
+                  <h2>Business Day is Closed</h2>
+                  <p>
+                    To guarantee transaction integrity and avoid cross-date bookkeeping issues,{" "}
+                    <b>{currentItem?.label || "This section"}</b> is disabled until a business day is started.
+                    Starting of Day (SOD) locks all subsequent sales, expenses, commissions, and payroll to that business date even past 12 midnight.
+                  </p>
+                  <div className="shift-locked-tabs">
+                    <span className="shift-locked-tab-chip"><Lock size={12} /> POS</span>
+                    <span className="shift-locked-tab-chip"><Lock size={12} /> Expenses</span>
+                    <span className="shift-locked-tab-chip"><Lock size={12} /> Commissions</span>
+                    <span className="shift-locked-tab-chip"><Lock size={12} /> LD Commissions</span>
+                    <span className="shift-locked-tab-chip"><Lock size={12} /> Salary</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ padding: "12px 28px", fontSize: 15 }}
+                      onClick={() => {
+                        setSodForm({ businessDate: ymd(), openingCash: "0", notes: "" });
+                        setShowSodModal(true);
+                      }}
+                    >
+                      <Sunrise size={18} /> Start of Day (SOD)
+                    </button>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      onClick={() => setTab(currentUser.role === "admin" ? "admin-dashboard" : "dashboard")}
+                    >
+                      View Reports Dashboard
+                    </button>
+                  </div>
+                </div>
+              ) : Page ? (
+                <Page />
+              ) : (
+                <div className="empty">No access to this section.</div>
+              )}
             </main>
 
             {/* Create Branch Modal */}
