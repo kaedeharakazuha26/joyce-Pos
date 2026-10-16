@@ -10,17 +10,19 @@
   --radius: 14px;
 }
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #0e0f17;
   --bg-2: #14161f;
   --card: rgba(255, 255, 255, 0.045);
   --card-solid: #1a1c27;
-  --border: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.12);
   --text: #eef0f7;
-  --muted: #8b90a5;
-  --input: #10121a;
+  --muted: #9499af;
+  --input: #12141f;
   --shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
 }
 [data-theme="light"] {
+  color-scheme: light;
   --bg: #f4f5fa;
   --bg-2: #ffffff;
   --card: #ffffff;
@@ -89,11 +91,36 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .icon-btn { border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 6px; border-radius: 8px; display: inline-flex; }
 .icon-btn:hover { background: var(--card); color: var(--text); }
 input, select, textarea {
-  background: var(--input); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; width: 100%; outline: none;
+  background-color: var(--input);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  width: 100%;
+  outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-input:focus, select:focus, textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(255, 122, 61, 0.18); }
-input[type="date"] { width: auto; padding: 8px 10px; }
+input::placeholder, textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+select option {
+  background-color: var(--card-solid);
+  color: var(--text);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(255, 122, 61, 0.18);
+}
+input[type="date"] {
+  width: auto;
+  padding: 8px 10px;
+  color: var(--text);
+}
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.85);
+  cursor: pointer;
+}
 input[type="checkbox"] { width: auto; }
 .chip { border: 1px solid var(--border); background: var(--card); padding: 6px 14px; border-radius: 99px; cursor: pointer; font-size: 13px; color: var(--muted); transition: all 0.15s; }
 .chip:hover, .chip.active { background: var(--grad); color: #fff; border-color: transparent; }

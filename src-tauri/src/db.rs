@@ -129,6 +129,7 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             date TEXT NOT NULL,
             employee_id INTEGER,
             employee_name TEXT NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 1,
             amount REAL NOT NULL
         );
 
@@ -141,5 +142,10 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
         CREATE INDEX IF NOT EXISTS idx_items_sale ON sale_items(sale_id);
         CREATE INDEX IF NOT EXISTS idx_variants_product ON variants(product_id);
         "#,
-    )
+    )?;
+
+    // Safe column migrations for existing databases
+    let _ = conn.execute("ALTER TABLE ld_commissions ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1", []);
+
+    Ok(())
 }

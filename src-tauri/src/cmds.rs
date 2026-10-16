@@ -399,9 +399,16 @@ pub fn list_ld_commissions(db: State<Db>, from: String, to: String) -> R<Vec<Val
 pub fn save_ld_commission(db: State<Db>, commission: Value) -> R<()> {
     let c = db.0.lock().map_err(e)?;
     let (date, eid, name, _, amt) = comm_args(&commission, false)?;
+    let qty = commission.get("quantity").and_then(|x| x.as_i64()).unwrap_or(1).max(1);
     match commission.get("id").and_then(|x| x.as_i64()) {
-        Some(id) => c.execute("UPDATE ld_commissions SET date=?,employee_id=?,employee_name=?,amount=? WHERE id=?", params![date, eid, name, amt, id]),
-        None => c.execute("INSERT INTO ld_commissions(date,employee_id,employee_name,amount) VALUES(?,?,?,?)", params![date, eid, name, amt]),
+        Some(id) => c.execute(
+            "UPDATE ld_commissions SET date=?,employee_id=?,employee_name=?,quantity=?,amount=? WHERE id=?",
+            params![date, eid, name, qty, amt, id],
+        ),
+        None => c.execute(
+            "INSERT INTO ld_commissions(date,employee_id,employee_name,quantity,amount) VALUES(?,?,?,?,?)",
+            params![date, eid, name, qty, amt],
+        ),
     }
     .map_err(e)?;
     Ok(())
