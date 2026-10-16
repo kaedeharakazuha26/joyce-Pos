@@ -109,6 +109,29 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             created_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS commission_types(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE
+        );
+        INSERT OR IGNORE INTO commission_types(name) VALUES('Sales'),('Bonus'),('Referral');
+
+        CREATE TABLE IF NOT EXISTS commissions(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            employee_id INTEGER,
+            employee_name TEXT NOT NULL,
+            type TEXT NOT NULL DEFAULT '',
+            amount REAL NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS ld_commissions(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            employee_id INTEGER,
+            employee_name TEXT NOT NULL,
+            amount REAL NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS settings(
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL

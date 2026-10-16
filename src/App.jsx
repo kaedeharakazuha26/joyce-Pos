@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { LayoutDashboard, ShoppingCart, History, Package, Boxes, Receipt as ReceiptIcon, Wallet, Users, Settings as Cog } from "lucide-react";
+import { LayoutDashboard, ShoppingCart, History, Package, Boxes, Receipt as ReceiptIcon, Wallet, Users, Coins, Smartphone, Settings as Cog } from "lucide-react";
 import { ToastProvider } from "./components/ui";
 import { api } from "./api";
 import Dashboard from "./pages/Dashboard";
@@ -9,6 +9,7 @@ import Products from "./pages/Products";
 import Inventory from "./pages/Inventory";
 import Expenses from "./pages/Expenses";
 import Salary from "./pages/Salary";
+import { Commission, LDCommission } from "./pages/Commissions";
 import Employees from "./pages/Employees";
 import Settings from "./pages/Settings";
 
@@ -23,6 +24,8 @@ const NAV = [
   { id: "inventory", label: "Inventory", icon: Boxes, page: Inventory },
   { id: "expenses", label: "Expenses", icon: ReceiptIcon, page: Expenses },
   { id: "salary", label: "Salary", icon: Wallet, page: Salary },
+  { id: "commission", label: "Commission", icon: Coins, page: Commission },
+  { id: "ld-commission", label: "LD Commission", icon: Smartphone, page: LDCommission },
   { id: "employees", label: "Employees", icon: Users, page: Employees },
   { id: "settings", label: "Settings", icon: Cog, page: Settings },
 ];

@@ -4,7 +4,7 @@ import { api } from "../api";
 import { Empty, Field, Modal, PageHeader, RangeBar, useToast } from "../components/ui";
 import { errText, monthStart, peso, ymd } from "../utils";
 
-const blank = () => ({ employee: "", amount: "", period: "", date: ymd(), note: "" });
+const blank = () => ({ employee: "", amount: "", date: ymd(), note: "" });
 
 export default function Salary() {
   const [from, setFrom] = useState(monthStart());
@@ -32,11 +32,11 @@ export default function Salary() {
       <div className="card">
         {list.length === 0 ? <Empty text="No salary records" /> : (
           <table>
-            <thead><tr><th>Date</th><th>Employee</th><th>Period</th><th>Note</th><th className="num">Amount</th><th></th></tr></thead>
+            <thead><tr><th>Date</th><th>Employee</th><th>Note</th><th className="num">Amount</th><th></th></tr></thead>
             <tbody>
               {list.map((x) => (
                 <tr key={x.id} className="row-hover">
-                  <td className="muted">{x.date}</td><td><b>{x.employee}</b></td><td>{x.period || "—"}</td><td>{x.note}</td>
+                  <td className="muted">{x.date}</td><td><b>{x.employee}</b></td><td>{x.note}</td>
                   <td className="num">{peso(x.amount)}</td>
                   <td><div className="actions">
                     <button className="icon-btn" onClick={() => setForm({ ...x })}><Pencil size={16} /></button>
@@ -55,7 +55,6 @@ export default function Salary() {
             <Field label="Amount"><input type="number" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></Field>
             <Field label="Date paid"><input type="date" style={{ width: "100%" }} value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
           </div>
-          <Field label="Pay period"><input value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })} placeholder="e.g. Oct 1–15" /></Field>
           <Field label="Note"><input value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} /></Field>
           <button className="btn" disabled={!form.employee || !(Number(form.amount) > 0)} onClick={save}>Save</button>
         </Modal>

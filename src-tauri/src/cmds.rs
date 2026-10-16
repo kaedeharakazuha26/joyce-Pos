@@ -330,6 +330,90 @@ pub fn delete_salary(db: State<Db>, id: i64) -> R<()> {
     Ok(())
 }
 
+// ───────────────────────── Commissions ─────────────────────────
+
+fn comm_args(v: &Value, with_type: bool) -> R<(String, Option<i64>, String, String, f64)> {
+    let name = text(v, "employee_name");
+    if name.is_empty() {
+        return Err("Select an employee".into());
+    }
+    let ty = text(v, "type");
+    if with_type && ty.is_empty() {
+        return Err("Select a commission type".into());
+    }
+    if num(v, "amount") <= 0.0 {
+        return Err("Amount must be greater than 0".into());
+    }
+    Ok((text(v, "date"), v.get("employee_id").and_then(|x| x.as_i64()), name, ty, num(v, "amount")))
+}
+
+#[tauri::command]
+pub fn list_commissions(db: State<Db>, from: String, to: String) -> R<Vec<Value>> {
+    let c = db.0.lock().map_err(e)?;
+    rows(&c, "SELECT * FROM commissions WHERE date BETWEEN ?1 AND ?2 ORDER BY date DESC, id DESC", &[&from, &to])
+}
+
+#[tauri::command]
+pub fn save_commission(db: State<Db>, commission: Value) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    let (date, eid, name, ty, amt) = comm_args(&commission, true)?;
+    match commission.get("id").and_then(|x| x.as_i64()) {
+        Some(id) => c.execute("UPDATE commissions SET date=?,employee_id=?,employee_name=?,type=?,amount=? WHERE id=?", params![date, eid, name, ty, amt, id]),
+        None => c.execute("INSERT INTO commissions(date,employee_id,employee_name,type,amount) VALUES(?,?,?,?,?)", params![date, eid, name, ty, amt]),
+    }
+    .map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_commission(db: State<Db>, id: i64) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    c.execute("DELETE FROM commissions WHERE id=?", [id]).map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_commission_types(db: State<Db>) -> R<Vec<Value>> {
+    let c = db.0.lock().map_err(e)?;
+    rows(&c, "SELECT * FROM commission_types ORDER BY name COLLATE NOCASE", &[])
+}
+
+#[tauri::command]
+pub fn add_commission_type(db: State<Db>, name: String) -> R<()> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err("Type name is required".into());
+    }
+    let c = db.0.lock().map_err(e)?;
+    c.execute("INSERT OR IGNORE INTO commission_types(name) VALUES(?)", [name]).map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_ld_commissions(db: State<Db>, from: String, to: String) -> R<Vec<Value>> {
+    let c = db.0.lock().map_err(e)?;
+    rows(&c, "SELECT * FROM ld_commissions WHERE date BETWEEN ?1 AND ?2 ORDER BY date DESC, id DESC", &[&from, &to])
+}
+
+#[tauri::command]
+pub fn save_ld_commission(db: State<Db>, commission: Value) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    let (date, eid, name, _, amt) = comm_args(&commission, false)?;
+    match commission.get("id").and_then(|x| x.as_i64()) {
+        Some(id) => c.execute("UPDATE ld_commissions SET date=?,employee_id=?,employee_name=?,amount=? WHERE id=?", params![date, eid, name, amt, id]),
+        None => c.execute("INSERT INTO ld_commissions(date,employee_id,employee_name,amount) VALUES(?,?,?,?)", params![date, eid, name, amt]),
+    }
+    .map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_ld_commission(db: State<Db>, id: i64) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    c.execute("DELETE FROM ld_commissions WHERE id=?", [id]).map_err(e)?;
+    Ok(())
+}
+
 // ───────────────────────── Employees ─────────────────────────
 
 #[tauri::command]

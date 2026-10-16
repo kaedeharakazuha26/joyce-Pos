@@ -50,7 +50,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   radial-gradient(900px 500px at 85% -10%, rgba(255, 106, 61, 0.14), transparent 60%),
   radial-gradient(700px 500px at 0% 110%, rgba(236, 63, 142, 0.1), transparent 60%), var(--bg); }
 .sidebar {
-  width: 232px; flex-shrink: 0; padding: 18px 14px; display: flex; flex-direction: column; gap: 4px;
+  width: 232px; flex-shrink: 0; padding: 18px 14px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto;
   background: var(--bg-2); border-right: 1px solid var(--border);
 }
 .brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px 18px; }
