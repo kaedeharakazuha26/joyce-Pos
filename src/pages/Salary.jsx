@@ -3,10 +3,12 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "../api";
 import { Empty, Field, Modal, PageHeader, RangeBar, useToast } from "../components/ui";
 import { errText, monthStart, peso, ymd } from "../utils";
+import { useSettings } from "../App";
 
-const blank = () => ({ employee: "", amount: "", date: ymd(), note: "" });
+const blank = (date = ymd()) => ({ employee: "", amount: "", date, note: "" });
 
 export default function Salary() {
+  const { activeBusinessDate } = useSettings();
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(ymd());
   const [list, setList] = useState([]);
@@ -60,7 +62,7 @@ export default function Salary() {
     <>
       <PageHeader title="Salary" subtitle={`Total paid ${peso(total)}`}>
         <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
-        <button className="btn" onClick={() => setForm(blank())}>
+        <button className="btn" onClick={() => setForm(blank(activeBusinessDate || ymd()))}>
           <Plus size={16} /> Record salary
         </button>
       </PageHeader>

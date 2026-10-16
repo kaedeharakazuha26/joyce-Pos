@@ -22,8 +22,9 @@ function Items({ items }) {
 }
 
 export default function Transactions() {
-  const [from, setFrom] = useState(ymd());
-  const [to, setTo] = useState(ymd());
+  const { settings, currentUser, activeBusinessDate } = useSettings();
+  const [from, setFrom] = useState(activeBusinessDate || ymd());
+  const [to, setTo] = useState(activeBusinessDate || ymd());
   const [view, setView] = useState("sales"); // sales | voided
   const [sales, setSales] = useState([]);
   const [voided, setVoided] = useState([]);
@@ -32,7 +33,6 @@ export default function Transactions() {
   const [reason, setReason] = useState("");
   const [reprint, setReprint] = useState(null);
   const toast = useToast();
-  const { settings, currentUser } = useSettings();
   const voidedByName = currentUser?.name || (currentUser?.role === "admin" ? "Administrator" : "Staff");
 
   const load = useCallback(() => {

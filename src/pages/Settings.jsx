@@ -117,15 +117,22 @@ export default function Settings() {
   const persist = () => run(() => save(s), "Settings saved");
   const scanUsb = () => run(async () => setUsb(await api.usbDevices()));
 
+  const activeBranch = branchInfo?.branches?.find((b) => b.id === branchInfo?.active_branch) || {
+    id: "main",
+    name: "Main Store",
+    file: "joyce_pos.db",
+  };
+
   const backup = () =>
     run(async () => {
+      const safeBranchName = activeBranch.name.replace(/[^a-zA-Z0-9_-]/g, "_");
       const path = await saveDialog({
-        defaultPath: `joyce-pos-backup-${ymd()}.db`,
+        defaultPath: `joyce_pos_${safeBranchName}_${ymd()}.db`,
         filters: [{ name: "SQLite database", extensions: ["db"] }],
       });
       if (path) {
-        await api.backup(path);
-        toast("Backup saved: " + path);
+        const msg = await api.backup(path);
+        toast(typeof msg === "string" ? msg : `Backup for branch '${activeBranch.name}' saved`);
       }
     });
 
@@ -136,9 +143,9 @@ export default function Settings() {
         filters: [{ name: "SQLite database", extensions: ["db"] }],
       });
       if (!path) return;
-      if (!confirm("Restoring replaces ALL current data with the backup. Continue?")) return;
-      await api.restore(path);
-      toast("Database restored — reloading…");
+      if (!confirm(`Warning: Restoring will overwrite ALL database records for branch [${activeBranch.name}]. Other branch databases will not be touched. Continue?`)) return;
+      const msg = await api.restore(path);
+      toast(typeof msg === "string" ? msg : `Branch '${activeBranch.name}' database restored — reloading…`);
       setTimeout(() => location.reload(), 900);
     });
 
@@ -351,17 +358,39 @@ export default function Settings() {
             </div>
           </div>
           <div className="card">
-            <h3>Database</h3>
-            <p className="muted" style={{ marginBottom: 14 }}>
-              All data is stored offline in a local SQLite file. Back it up regularly to a USB
-              drive.
-            </p>
-            <div style={{ display: "flex", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+              <DatabaseBackup size={20} color="var(--accent)" />
+              <h3 style={{ margin: 0 }}>Branch Database Backup & Restore</h3>
+            </div>
+
+            <div
+              style={{
+                background: "var(--bg-2)",
+                border: "1px solid var(--border)",
+                padding: "12px 14px",
+                borderRadius: 10,
+                marginBottom: 14,
+                fontSize: 13,
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                <div>
+                  <span>Active Branch: <b>{activeBranch.name}</b></span>
+                  <span className="muted" style={{ marginLeft: 8 }}>({activeBranch.file})</span>
+                </div>
+                <span className="badge ok">Branch-Specific Backup</span>
+              </div>
+              <p className="muted" style={{ margin: "6px 0 0 0", fontSize: 12 }}>
+                Backup and restore operations below only affect the selected branch database. To backup or restore another branch, switch branches first.
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button className="btn" onClick={backup}>
-                <DatabaseBackup size={17} /> Backup database
+                <DatabaseBackup size={17} /> Backup [{activeBranch.name}]
               </button>
               <button className="btn ghost" onClick={restore}>
-                <DatabaseZap size={17} /> Restore database
+                <DatabaseZap size={17} /> Restore [{activeBranch.name}]
               </button>
             </div>
           </div>

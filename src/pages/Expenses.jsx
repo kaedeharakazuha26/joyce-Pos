@@ -4,9 +4,12 @@ import { api } from "../api";
 import { Empty, Field, Modal, PageHeader, RangeBar, useToast } from "../components/ui";
 import { errText, monthStart, peso, ymd } from "../utils";
 
-const blank = () => ({ category: "", description: "", amount: "", date: ymd() });
+import { useSettings } from "../App";
+
+const blank = (date = ymd()) => ({ category: "", description: "", amount: "", date });
 
 export default function Expenses() {
+  const { activeBusinessDate } = useSettings();
   const [from, setFrom] = useState(monthStart());
   const [to, setTo] = useState(ymd());
   const [list, setList] = useState([]);
@@ -27,7 +30,7 @@ export default function Expenses() {
     <>
       <PageHeader title="Expenses" subtitle={`Total ${peso(total)}`}>
         <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
-        <button className="btn" onClick={() => setForm(blank())}><Plus size={16} /> Add expense</button>
+        <button className="btn" onClick={() => setForm(blank(activeBusinessDate || ymd()))}><Plus size={16} /> Add expense</button>
       </PageHeader>
       <div className="card">
         {list.length === 0 ? <Empty text="No expenses recorded" /> : (

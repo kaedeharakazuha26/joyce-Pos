@@ -1,6 +1,6 @@
 use crate::db::Db;
 use crate::printer;
-use rusqlite::{params, types::ValueRef, Connection, OpenFlags, ToSql};
+use rusqlite::{params, types::ValueRef, Connection, OpenFlags, OptionalExtension, ToSql};
 use serde_json::{json, Map, Value};
 use std::collections::HashMap;
 use tauri::State;
@@ -13,6 +13,25 @@ pub fn e<E: ToString>(x: E) -> String {
 fn now() -> String {
     chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
 }
+
+pub fn get_active_shift(c: &Connection) -> Option<(i64, String)> {
+    c.query_row(
+        "SELECT id, business_date FROM shifts WHERE status='open' ORDER BY id DESC LIMIT 1",
+        [],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    ).ok()
+}
+
+pub fn active_business_date(c: &Connection) -> String {
+    get_active_shift(c).map(|(_, d)| d).unwrap_or_else(|| chrono::Local::now().format("%Y-%m-%d").to_string())
+}
+
+pub fn business_now(c: &Connection) -> String {
+    let bdate = active_business_date(c);
+    let time = chrono::Local::now().format("%H:%M:%S");
+    format!("{} {}", bdate, time)
+}
+
 fn num(v: &Value, k: &str) -> f64 {
     v.get(k).and_then(|x| x.as_f64()).unwrap_or(0.0)
 }
@@ -133,14 +152,26 @@ pub fn create_sale(db: State<Db>, items: Vec<Value>, paid: f64) -> R<Value> {
     if items.is_empty() {
         return Err("Cart is empty".into());
     }
-    let day = chrono::Local::now().format("%Y%m%d").to_string();
+    let (biz_date, receipt_prefix) = match get_active_shift(&tx) {
+        Some((_, bdate)) => {
+            let clean = bdate.replace("-", "");
+            (bdate, clean)
+        }
+        None => {
+            (
+                chrono::Local::now().format("%Y-%m-%d").to_string(),
+                chrono::Local::now().format("%Y%m%d").to_string(),
+            )
+        }
+    };
     let n: i64 = tx
-        .query_row("SELECT COUNT(*) FROM sales WHERE date(created_at)=date('now','localtime')", [], |r| r.get(0))
+        .query_row("SELECT COUNT(*) FROM sales WHERE date(created_at)=?1", [&biz_date], |r| r.get(0))
         .map_err(e)?;
-    let receipt = format!("JP-{}-{:04}", day, n + 1);
+    let receipt = format!("JP-{}-{:04}", receipt_prefix, n + 1);
+    let created_at = format!("{} {}", biz_date, chrono::Local::now().format("%H:%M:%S"));
     tx.execute(
         "INSERT INTO sales(receipt_no,total,paid,change_amt,status,created_at) VALUES(?,0,0,0,'completed',?)",
-        params![receipt, now()],
+        params![receipt, created_at],
     )
     .map_err(e)?;
     let sid = tx.last_insert_rowid();
@@ -218,7 +249,7 @@ pub fn void_sale(db: State<Db>, id: i64, reason: String, voided_by: Option<Strin
         let units = it["units_per"].as_i64().unwrap_or(1) * it["quantity"].as_i64().unwrap_or(0);
         tx.execute("UPDATE products SET stock=stock+? WHERE id=?", params![units, it["product_id"].as_i64()]).map_err(e)?;
     }
-    let ts = now();
+    let ts = business_now(&tx);
     let who = voided_by.unwrap_or_default();
     tx.execute("UPDATE sales SET status='voided',voided_at=?,void_reason=?,voided_by=? WHERE id=?", params![ts, reason, who, id]).map_err(e)?;
     tx.execute(
@@ -254,9 +285,10 @@ pub fn restock(db: State<Db>, product_id: i64, qty: i64, unit_cost: f64, note: S
     if unit_cost > 0.0 {
         tx.execute("UPDATE products SET cost=? WHERE id=?", params![unit_cost, product_id]).map_err(e)?;
     }
+    let created_at = business_now(&tx);
     tx.execute(
         "INSERT INTO restocks(product_id,product_name,qty,unit_cost,note,created_at) VALUES(?,?,?,?,?,?)",
-        params![product_id, name, qty, unit_cost, note, now()],
+        params![product_id, name, qty, unit_cost, note, created_at],
     )
     .map_err(e)?;
     tx.commit().map_err(e)
@@ -282,7 +314,9 @@ pub fn save_expense(db: State<Db>, expense: Value) -> R<()> {
     if num(&expense, "amount") <= 0.0 {
         return Err("Amount must be greater than 0".into());
     }
-    let (cat, desc, amt, date) = (text(&expense, "category"), text(&expense, "description"), num(&expense, "amount"), text(&expense, "date"));
+    let raw_date = text(&expense, "date");
+    let date = if raw_date.is_empty() { active_business_date(&c) } else { raw_date };
+    let (cat, desc, amt) = (text(&expense, "category"), text(&expense, "description"), num(&expense, "amount"));
     match expense.get("id").and_then(|x| x.as_i64()) {
         Some(id) => c.execute("UPDATE expenses SET category=?,description=?,amount=?,date=? WHERE id=?", params![cat, desc, amt, date, id]),
         None => c.execute("INSERT INTO expenses(category,description,amount,date) VALUES(?,?,?,?)", params![cat, desc, amt, date]),
@@ -310,14 +344,16 @@ pub fn save_salary(db: State<Db>, salary: Value) -> R<()> {
     if text(&salary, "employee").is_empty() || num(&salary, "amount") <= 0.0 {
         return Err("Employee and amount are required".into());
     }
+    let raw_date = text(&salary, "date");
+    let date = if raw_date.is_empty() { active_business_date(&c) } else { raw_date };
     match salary.get("id").and_then(|x| x.as_i64()) {
         Some(id) => c.execute(
             "UPDATE salaries SET employee=?,amount=?,period=?,date=?,note=? WHERE id=?",
-            params![text(&salary, "employee"), num(&salary, "amount"), text(&salary, "period"), text(&salary, "date"), text(&salary, "note"), id],
+            params![text(&salary, "employee"), num(&salary, "amount"), text(&salary, "period"), date, text(&salary, "note"), id],
         ),
         None => c.execute(
             "INSERT INTO salaries(employee,amount,period,date,note) VALUES(?,?,?,?,?)",
-            params![text(&salary, "employee"), num(&salary, "amount"), text(&salary, "period"), text(&salary, "date"), text(&salary, "note")],
+            params![text(&salary, "employee"), num(&salary, "amount"), text(&salary, "period"), date, text(&salary, "note")],
         ),
     }
     .map_err(e)?;
@@ -333,7 +369,7 @@ pub fn delete_salary(db: State<Db>, id: i64) -> R<()> {
 
 // ───────────────────────── Commissions ─────────────────────────
 
-fn comm_args(v: &Value, with_type: bool) -> R<(String, Option<i64>, String, String, f64)> {
+fn comm_args(c: &Connection, v: &Value, with_type: bool) -> R<(String, Option<i64>, String, String, f64)> {
     let name = text(v, "employee_name");
     if name.is_empty() {
         return Err("Select an employee".into());
@@ -345,7 +381,9 @@ fn comm_args(v: &Value, with_type: bool) -> R<(String, Option<i64>, String, Stri
     if num(v, "amount") <= 0.0 {
         return Err("Amount must be greater than 0".into());
     }
-    Ok((text(v, "date"), v.get("employee_id").and_then(|x| x.as_i64()), name, ty, num(v, "amount")))
+    let raw_date = text(v, "date");
+    let date = if raw_date.is_empty() { active_business_date(c) } else { raw_date };
+    Ok((date, v.get("employee_id").and_then(|x| x.as_i64()), name, ty, num(v, "amount")))
 }
 
 #[tauri::command]
@@ -357,7 +395,7 @@ pub fn list_commissions(db: State<Db>, from: String, to: String) -> R<Vec<Value>
 #[tauri::command]
 pub fn save_commission(db: State<Db>, commission: Value) -> R<()> {
     let c = db.0.lock().map_err(e)?;
-    let (date, eid, name, ty, amt) = comm_args(&commission, true)?;
+    let (date, eid, name, ty, amt) = comm_args(&c, &commission, true)?;
     match commission.get("id").and_then(|x| x.as_i64()) {
         Some(id) => c.execute("UPDATE commissions SET date=?,employee_id=?,employee_name=?,type=?,amount=? WHERE id=?", params![date, eid, name, ty, amt, id]),
         None => c.execute("INSERT INTO commissions(date,employee_id,employee_name,type,amount) VALUES(?,?,?,?,?)", params![date, eid, name, ty, amt]),
@@ -399,7 +437,7 @@ pub fn list_ld_commissions(db: State<Db>, from: String, to: String) -> R<Vec<Val
 #[tauri::command]
 pub fn save_ld_commission(db: State<Db>, commission: Value) -> R<()> {
     let c = db.0.lock().map_err(e)?;
-    let (date, eid, name, _, amt) = comm_args(&commission, false)?;
+    let (date, eid, name, _, amt) = comm_args(&c, &commission, false)?;
     let qty = commission.get("quantity").and_then(|x| x.as_i64()).unwrap_or(1).max(1);
     match commission.get("id").and_then(|x| x.as_i64()) {
         Some(id) => c.execute(
@@ -496,7 +534,41 @@ pub fn dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
         WHERE employee_name != ''
         GROUP BY employee_name
         ORDER BY total DESC
-        LIMIT 6
+        LIMIT 10
+        "#,
+        p,
+    )?;
+
+    let daily = rows(
+        &c,
+        r#"
+        SELECT day,
+               ROUND(SUM(sales), 2) AS total,
+               SUM(order_count) AS count,
+               ROUND(SUM(expenses), 2) AS expenses,
+               ROUND(SUM(salaries), 2) AS salaries,
+               ROUND(SUM(commissions), 2) AS commissions,
+               ROUND(SUM(ld_commissions), 2) AS ld_commissions,
+               ROUND(SUM(sales - expenses - salaries - commissions - ld_commissions), 2) AS net
+        FROM (
+            SELECT date(created_at) AS day, total AS sales, 1 AS order_count, 0.0 AS expenses, 0.0 AS salaries, 0.0 AS commissions, 0.0 AS ld_commissions
+            FROM sales WHERE status='completed' AND date(created_at) BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT date AS day, 0.0 AS sales, 0 AS order_count, amount AS expenses, 0.0 AS salaries, 0.0 AS commissions, 0.0 AS ld_commissions
+            FROM expenses WHERE date BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT date AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, amount AS salaries, 0.0 AS commissions, 0.0 AS ld_commissions
+            FROM salaries WHERE date BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT date AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, amount AS commissions, 0.0 AS ld_commissions
+            FROM commissions WHERE date BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT date AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, 0.0 AS commissions, amount AS ld_commissions
+            FROM ld_commissions WHERE date BETWEEN ?1 AND ?2
+        )
+        WHERE day IS NOT NULL AND day != ''
+        GROUP BY day
+        ORDER BY day ASC
         "#,
         p,
     )?;
@@ -510,10 +582,147 @@ pub fn dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
         "top_employees": top_employees,
         "inventory_cost": r2(scalar(&c, "SELECT COALESCE(SUM(stock*cost),0) FROM products WHERE active=1", &[])),
         "inventory_retail": r2(scalar(&c, "SELECT COALESCE(SUM(stock*price),0) FROM products WHERE active=1", &[])),
-        "daily": rows(&c, &format!("SELECT date(created_at) AS day, SUM(total) AS total, COUNT(*) AS count FROM sales WHERE {range} GROUP BY day ORDER BY day"), p)?,
+        "daily": daily,
         "top": rows(&c, &format!("SELECT name, SUM(units_per*quantity) AS units, SUM(subtotal) AS revenue FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE {range}) GROUP BY product_id ORDER BY revenue DESC LIMIT 8"), p)?,
         "low_stock": rows(&c, "SELECT id,name,stock,low_stock FROM products WHERE active=1 AND stock<=low_stock ORDER BY stock LIMIT 10", &[])?,
     }))
+}
+
+// ───────────────────────── Business Shifts (SOD / EOD) ─────────────────────────
+
+#[tauri::command]
+pub fn get_shift_status(db: State<Db>) -> R<Value> {
+    let c = db.0.lock().map_err(e)?;
+    let active = c.query_row(
+        "SELECT id, business_date, status, opened_by, opened_at, opening_cash, notes FROM shifts WHERE status='open' ORDER BY id DESC LIMIT 1",
+        [],
+        |r| {
+            Ok(json!({
+                "id": r.get::<_, i64>(0)?,
+                "business_date": r.get::<_, String>(1)?,
+                "status": r.get::<_, String>(2)?,
+                "opened_by": r.get::<_, String>(3)?,
+                "opened_at": r.get::<_, String>(4)?,
+                "opening_cash": r.get::<_, f64>(5)?,
+                "notes": r.get::<_, String>(6)?,
+            }))
+        },
+    ).optional().map_err(e)?;
+
+    match active {
+        Some(mut shift) => {
+            let biz_date = shift["business_date"].as_str().unwrap_or("").to_string();
+            let cash_sales: f64 = c.query_row(
+                "SELECT COALESCE(SUM(total), 0) FROM sales WHERE status='completed' AND date(created_at)=?1",
+                [&biz_date],
+                |r| r.get(0)
+            ).unwrap_or(0.0);
+            let expenses: f64 = c.query_row(
+                "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE date=?1",
+                [&biz_date],
+                |r| r.get(0)
+            ).unwrap_or(0.0);
+            let opening_cash = shift["opening_cash"].as_f64().unwrap_or(0.0);
+            let expected_cash = opening_cash + cash_sales - expenses;
+            shift["cash_sales"] = json!(r2(cash_sales));
+            shift["expenses"] = json!(r2(expenses));
+            shift["expected_cash"] = json!(r2(expected_cash));
+            Ok(json!({ "is_open": true, "shift": shift }))
+        }
+        None => {
+            let last = c.query_row(
+                "SELECT id, business_date, status, closed_at, closing_cash, expected_cash, cash_sales, expenses FROM shifts WHERE status='closed' ORDER BY id DESC LIMIT 1",
+                [],
+                |r| {
+                    Ok(json!({
+                        "id": r.get::<_, i64>(0)?,
+                        "business_date": r.get::<_, String>(1)?,
+                        "status": r.get::<_, String>(2)?,
+                        "closed_at": r.get::<_, Option<String>>(3)?,
+                        "closing_cash": r.get::<_, f64>(4)?,
+                        "expected_cash": r.get::<_, f64>(5)?,
+                        "cash_sales": r.get::<_, f64>(6)?,
+                        "expenses": r.get::<_, f64>(7)?,
+                    }))
+                }
+            ).optional().map_err(e)?;
+            Ok(json!({ "is_open": false, "last_shift": last }))
+        }
+    }
+}
+
+#[tauri::command]
+pub fn start_day(db: State<Db>, business_date: String, opened_by: String, opening_cash: f64, notes: String) -> R<Value> {
+    let c = db.0.lock().map_err(e)?;
+    let exists: i64 = c.query_row("SELECT COUNT(*) FROM shifts WHERE status='open'", [], |r| r.get(0)).unwrap_or(0);
+    if exists > 0 {
+        return Err("A business day shift is already open. Please end the current day first.".into());
+    }
+    let bdate = if business_date.trim().is_empty() {
+        chrono::Local::now().format("%Y-%m-%d").to_string()
+    } else {
+        business_date.trim().to_string()
+    };
+    let opened_at = now();
+    c.execute(
+        "INSERT INTO shifts(business_date, status, opened_by, opened_at, opening_cash, notes) VALUES(?, 'open', ?, ?, ?, ?)",
+        params![bdate, opened_by, opened_at, opening_cash, notes],
+    ).map_err(e)?;
+    let id = c.last_insert_rowid();
+    Ok(json!({ "id": id, "business_date": bdate, "opened_by": opened_by, "opening_cash": opening_cash }))
+}
+
+#[tauri::command]
+pub fn end_day(db: State<Db>, closing_cash: f64, closed_by: String, notes: String) -> R<Value> {
+    let c = db.0.lock().map_err(e)?;
+    let active = c.query_row(
+        "SELECT id, business_date, opening_cash FROM shifts WHERE status='open' ORDER BY id DESC LIMIT 1",
+        [],
+        |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, f64>(2)?)),
+    ).map_err(|_| "No open business day shift found.".to_string())?;
+
+    let (shift_id, biz_date, opening_cash) = active;
+    let cash_sales: f64 = c.query_row(
+        "SELECT COALESCE(SUM(total), 0) FROM sales WHERE status='completed' AND date(created_at)=?1",
+        [&biz_date],
+        |r| r.get(0)
+    ).unwrap_or(0.0);
+    let expenses: f64 = c.query_row(
+        "SELECT COALESCE(SUM(amount), 0) FROM expenses WHERE date=?1",
+        [&biz_date],
+        |r| r.get(0)
+    ).unwrap_or(0.0);
+    let expected_cash = opening_cash + cash_sales - expenses;
+    let closed_at = now();
+
+    c.execute(
+        r#"
+        UPDATE shifts
+        SET status='closed', closed_by=?, closed_at=?, closing_cash=?, expected_cash=?, cash_sales=?, expenses=?, notes=CASE WHEN ? != '' THEN ? ELSE notes END
+        WHERE id=?
+        "#,
+        params![closed_by, closed_at, closing_cash, expected_cash, cash_sales, expenses, notes, notes, shift_id],
+    ).map_err(e)?;
+
+    Ok(json!({
+        "id": shift_id,
+        "business_date": biz_date,
+        "opening_cash": r2(opening_cash),
+        "cash_sales": r2(cash_sales),
+        "expenses": r2(expenses),
+        "expected_cash": r2(expected_cash),
+        "closing_cash": r2(closing_cash),
+        "variance": r2(closing_cash - expected_cash),
+        "closed_at": closed_at,
+        "closed_by": closed_by
+    }))
+}
+
+#[tauri::command]
+pub fn list_shifts(db: State<Db>, limit: Option<i64>) -> R<Vec<Value>> {
+    let c = db.0.lock().map_err(e)?;
+    let lim = limit.unwrap_or(30);
+    rows(&c, &format!("SELECT * FROM shifts ORDER BY id DESC LIMIT {}", lim), &[])
 }
 
 // ───────────────────────── Settings & database ─────────────────────────
@@ -540,15 +749,19 @@ pub fn set_settings(db: State<Db>, values: HashMap<String, String>) -> R<()> {
 }
 
 #[tauri::command]
-pub fn backup_db(db: State<Db>, path: String) -> R<()> {
+pub fn backup_db(db: State<Db>, path: String) -> R<String> {
+    let branch_name = {
+        let bs = db.1.lock().map_err(e)?;
+        bs.config.branches.iter().find(|b| b.id == bs.config.active_branch).map(|b| b.name.clone()).unwrap_or_else(|| "Main Branch".into())
+    };
     let c = db.0.lock().map_err(e)?;
     let _ = std::fs::remove_file(&path);
     c.execute("VACUUM INTO ?1", [&path]).map_err(e)?;
-    Ok(())
+    Ok(format!("Backup for branch '{}' saved successfully", branch_name))
 }
 
 #[tauri::command]
-pub fn restore_db(db: State<Db>, path: String) -> R<()> {
+pub fn restore_db(db: State<Db>, path: String) -> R<String> {
     let src = Connection::open_with_flags(&path, OpenFlags::SQLITE_OPEN_READ_ONLY).map_err(e)?;
     let ok: i64 = src
         .query_row("SELECT COUNT(*) FROM sqlite_master WHERE name IN ('products','sales','settings')", [], |r| r.get(0))
@@ -561,7 +774,12 @@ pub fn restore_db(db: State<Db>, path: String) -> R<()> {
         let b = rusqlite::backup::Backup::new(&src, &mut *c).map_err(e)?;
         b.run_to_completion(100, std::time::Duration::from_millis(0), None).map_err(e)?;
     }
-    crate::db::init(&c).map_err(e)
+    crate::db::init(&c).map_err(e)?;
+    let branch_name = {
+        let bs = db.1.lock().map_err(e)?;
+        bs.config.branches.iter().find(|b| b.id == bs.config.active_branch).map(|b| b.name.clone()).unwrap_or_else(|| "Selected Branch".into())
+    };
+    Ok(format!("Database for branch '{}' restored successfully", branch_name))
 }
 
 // ───────────────────────── Printing ─────────────────────────

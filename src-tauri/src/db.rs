@@ -263,9 +263,26 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             value TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS shifts(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            business_date TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'open',
+            opened_by TEXT NOT NULL DEFAULT '',
+            opened_at TEXT NOT NULL,
+            opening_cash REAL NOT NULL DEFAULT 0,
+            closed_by TEXT NOT NULL DEFAULT '',
+            closed_at TEXT,
+            closing_cash REAL NOT NULL DEFAULT 0,
+            expected_cash REAL NOT NULL DEFAULT 0,
+            cash_sales REAL NOT NULL DEFAULT 0,
+            expenses REAL NOT NULL DEFAULT 0,
+            notes TEXT NOT NULL DEFAULT ''
+        );
+
         CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
         CREATE INDEX IF NOT EXISTS idx_items_sale ON sale_items(sale_id);
         CREATE INDEX IF NOT EXISTS idx_variants_product ON variants(product_id);
+        CREATE INDEX IF NOT EXISTS idx_shifts_status ON shifts(status);
         "#,
     )?;
 

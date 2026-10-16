@@ -34,6 +34,12 @@ export const api = {
   saveEmployee: (employee) => call("save_employee", { employee }),
   deleteEmployee: (id) => call("delete_employee", { id }),
   dashboard: (from, to) => call("dashboard", { from, to }),
+  getShiftStatus: () => call("get_shift_status"),
+  startDay: (businessDate, openedBy, openingCash, notes) =>
+    call("start_day", { businessDate, openedBy, openingCash, notes }),
+  endDay: (closingCash, closedBy, notes) =>
+    call("end_day", { closingCash, closedBy, notes }),
+  listShifts: (limit = 30) => call("list_shifts", { limit }),
   getSettings: () => call("get_settings"),
   setSettings: (values) => call("set_settings", { values }),
   backup: (path) => call("backup_db", { path }),

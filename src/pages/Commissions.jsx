@@ -3,6 +3,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "../api";
 import { Empty, Field, Modal, PageHeader, RangeBar, useToast } from "../components/ui";
 import { errText, monthStart, peso, ymd } from "../utils";
+import { useSettings } from "../App";
 
 /**
  * Shared page for "Commission" (with a type) and "LD Commission" (with quantity multiplier).
@@ -11,6 +12,7 @@ import { errText, monthStart, peso, ymd } from "../utils";
  * and the resulting amount remains completely editable.
  */
 function CommissionBase({ kind }) {
+  const { activeBusinessDate } = useSettings();
   const isLd = kind === "ld";
   const title = isLd ? "LD Commission" : "Commission";
   const [from, setFrom] = useState(monthStart());
@@ -64,7 +66,7 @@ function CommissionBase({ kind }) {
 
   const open = () =>
     setForm({
-      date: ymd(),
+      date: activeBusinessDate || ymd(),
       employee_id: null,
       employee_name: "",
       type: types[0]?.name || "",
