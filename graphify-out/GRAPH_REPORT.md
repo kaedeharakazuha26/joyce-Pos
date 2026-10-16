@@ -1,17 +1,17 @@
 # Graph Report - Joy-Pos-Multiplatform  (2026-10-17)
 
 ## Corpus Check
-- 29 files · ~96,701 words
+- 29 files · ~96,852 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .icns 1, .ico 1)
 
 ## Summary
-- 212 nodes · 699 edges · 21 communities (14 shown, 7 thin omitted)
+- 212 nodes · 698 edges · 21 communities (14 shown, 7 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 12 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `813e75f2`
+- Built from commit: `11aee41b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -37,8 +37,8 @@
 ## God Nodes (most connected - your core abstractions)
 1. `Db` - 42 edges
 2. `errText()` - 23 edges
-3. `useToast()` - 21 edges
-4. `Empty()` - 21 edges
+3. `Empty()` - 21 edges
+4. `useToast()` - 21 edges
 5. `ymd()` - 20 edges
 6. `peso()` - 20 edges
 7. `PageHeader()` - 19 edges
