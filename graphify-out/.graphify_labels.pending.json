@@ -1,5 +1,5 @@
 {
-  "0": "R",
+  "0": "Connection",
   "1": "package.json",
   "2": "printer.rs",
   "3": "tauri.conf.json",
@@ -21,7 +21,5 @@
   "19": "Modal",
   "20": "R",
   "21": "Value",
-  "22": "admin_dashboard",
-  "23": "Commissions.jsx",
-  "24": "Connection"
+  "23": "Commissions.jsx"
 }
