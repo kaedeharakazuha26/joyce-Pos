@@ -54,9 +54,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/printer.rs": {
-    "mtime": 1792166747.6251707,
-    "seen": 1792167184.561079,
-    "ast_hash": "d78ac6b1b2a40f949d882a4116ac0f14",
+    "mtime": 1792176587.2680535,
+    "seen": 1792176853.4335299,
+    "ast_hash": "b54e6618e25274a8c405a96c3893f42d",
     "semantic_hash": ""
   },
   "src-tauri/tauri.conf.json": {
@@ -66,9 +66,9 @@
     "semantic_hash": ""
   },
   "src/App.jsx": {
-    "mtime": 1792175770.5891197,
-    "seen": 1792175955.706606,
-    "ast_hash": "0a2510cec5242019fe0cda4f01a757a5",
+    "mtime": 1792176685.2658072,
+    "seen": 1792176853.4335337,
+    "ast_hash": "56c2fa3524ca570ac83f57fc15fef4da",
     "semantic_hash": ""
   },
   "src/api.js": {
@@ -90,9 +90,9 @@
     "semantic_hash": ""
   },
   "src/pages/Dashboard.jsx": {
-    "mtime": 1792173811.8477108,
-    "seen": 1792174316.2582994,
-    "ast_hash": "6016ee1cf0b5ea07fc7e96ba0e857c83",
+    "mtime": 1792176749.6053019,
+    "seen": 1792176853.433544,
+    "ast_hash": "3657891043a0876bb82e6dc2221596c3",
     "semantic_hash": ""
   },
   "src/pages/Expenses.jsx": {
@@ -126,9 +126,9 @@
     "semantic_hash": ""
   },
   "src/pages/Settings.jsx": {
-    "mtime": 1792175903.9887035,
-    "seen": 1792175955.7066288,
-    "ast_hash": "d43e08934ae2cb9629eeb035d75eb738",
+    "mtime": 1792176824.3258762,
+    "seen": 1792176853.4335551,
+    "ast_hash": "521bcecaef517bc55bb8c9a6616737e8",
     "semantic_hash": ""
   },
   "src/pages/Transactions.jsx": {
