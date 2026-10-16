@@ -79,6 +79,11 @@ export default function POS() {
             {shown.map((p) => (
               <button key={p.id} className="pcard" disabled={remaining(p) <= 0} onClick={() => click(p)}>
                 {p.variants.length > 0 && <span className="vtag">{p.variants.length + 1} options</span>}
+                {p.image ? (
+                  <img src={p.image} alt={p.name} className="pcard-img" />
+                ) : (
+                  <div className="pcard-img-placeholder" />
+                )}
                 <span className="pname">{p.name}</span>
                 <span className="pprice">{peso(p.price)}</span>
                 <span className="pstock">{remaining(p) <= 0 ? "Out of stock" : `${remaining(p)} in stock`}</span>
