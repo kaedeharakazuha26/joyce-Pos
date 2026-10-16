@@ -1,0 +1,28 @@
+[package]
+name = "joyce-pos"
+version = "0.1.0"
+description = "JOYCE POS"
+edition = "2021"
+
+[lib]
+name = "joyce_pos_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled", "backup"] }
+chrono = "0.4"
+rusb = { version = "0.9", features = ["vendored"] }
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
