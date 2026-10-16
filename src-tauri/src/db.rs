@@ -43,7 +43,8 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             status TEXT NOT NULL DEFAULT 'completed',
             created_at TEXT NOT NULL,
             voided_at TEXT,
-            void_reason TEXT
+            void_reason TEXT,
+            voided_by TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS sale_items(
@@ -69,7 +70,8 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             reason TEXT NOT NULL DEFAULT '',
             items_json TEXT NOT NULL,
             sold_at TEXT NOT NULL,
-            voided_at TEXT NOT NULL
+            voided_at TEXT NOT NULL,
+            voided_by TEXT NOT NULL DEFAULT ''
         );
 
         CREATE TABLE IF NOT EXISTS restocks(
@@ -156,6 +158,8 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
     // Safe column migrations for existing databases
     let _ = conn.execute("ALTER TABLE products ADD COLUMN image TEXT NOT NULL DEFAULT ''", []);
     let _ = conn.execute("ALTER TABLE ld_commissions ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1", []);
+    let _ = conn.execute("ALTER TABLE sales ADD COLUMN voided_by TEXT NOT NULL DEFAULT ''", []);
+    let _ = conn.execute("ALTER TABLE voided_sales ADD COLUMN voided_by TEXT NOT NULL DEFAULT ''", []);
     let _ = conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('admin_pin', '0000')", []);
 
     Ok(())

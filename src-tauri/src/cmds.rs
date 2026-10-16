@@ -207,7 +207,7 @@ pub fn list_sales(db: State<Db>, from: String, to: String, status: String) -> R<
 
 /// Voids a sale: returns every item to inventory and stores a permanent record in `voided_sales`.
 #[tauri::command]
-pub fn void_sale(db: State<Db>, id: i64, reason: String) -> R<()> {
+pub fn void_sale(db: State<Db>, id: i64, reason: String, voided_by: Option<String>) -> R<()> {
     let mut c = db.0.lock().map_err(e)?;
     let tx = c.transaction().map_err(e)?;
     let sale = sale_detail(&tx, id)?;
@@ -219,10 +219,11 @@ pub fn void_sale(db: State<Db>, id: i64, reason: String) -> R<()> {
         tx.execute("UPDATE products SET stock=stock+? WHERE id=?", params![units, it["product_id"].as_i64()]).map_err(e)?;
     }
     let ts = now();
-    tx.execute("UPDATE sales SET status='voided',voided_at=?,void_reason=? WHERE id=?", params![ts, reason, id]).map_err(e)?;
+    let who = voided_by.unwrap_or_default();
+    tx.execute("UPDATE sales SET status='voided',voided_at=?,void_reason=?,voided_by=? WHERE id=?", params![ts, reason, who, id]).map_err(e)?;
     tx.execute(
-        "INSERT INTO voided_sales(sale_id,receipt_no,total,reason,items_json,sold_at,voided_at) VALUES(?,?,?,?,?,?,?)",
-        params![id, sale["receipt_no"].as_str(), sale["total"].as_f64(), reason, sale["items"].to_string(), sale["created_at"].as_str(), ts],
+        "INSERT INTO voided_sales(sale_id,receipt_no,total,reason,items_json,sold_at,voided_at,voided_by) VALUES(?,?,?,?,?,?,?,?)",
+        params![id, sale["receipt_no"].as_str(), sale["total"].as_f64(), reason, sale["items"].to_string(), sale["created_at"].as_str(), ts, who],
     )
     .map_err(e)?;
     tx.commit().map_err(e)

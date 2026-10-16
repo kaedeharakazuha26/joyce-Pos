@@ -14,7 +14,7 @@ import { Commission, LDCommission } from "./pages/Commissions";
 import Employees from "./pages/Employees";
 import Settings from "./pages/Settings";
 
-const SettingsCtx = createContext({ settings: {}, save: async () => { } });
+const SettingsCtx = createContext({ settings: {}, save: async () => { }, currentUser: null });
 export const useSettings = () => useContext(SettingsCtx);
 
 const NAV = [
@@ -91,7 +91,7 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <SettingsCtx.Provider value={{ settings, save }}>
+      <SettingsCtx.Provider value={{ settings, save, currentUser }}>
         {!currentUser ? (
           <PinLock onUnlock={handleUnlock} />
         ) : (

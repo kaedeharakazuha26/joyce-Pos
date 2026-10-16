@@ -12,7 +12,7 @@ export const api = {
   deleteProduct: (id) => call("delete_product", { id }),
   createSale: (items, paid) => call("create_sale", { items, paid }),
   sales: (from, to, status = "") => call("list_sales", { from, to, status }),
-  voidSale: (id, reason) => call("void_sale", { id, reason }),
+  voidSale: (id, reason, voidedBy = "") => call("void_sale", { id, reason, voidedBy }),
   voided: (from, to) => call("list_voided", { from, to }),
   restock: (productId, qty, unitCost, note) => call("restock", { productId, qty, unitCost, note }),
   restocks: () => call("list_restocks"),

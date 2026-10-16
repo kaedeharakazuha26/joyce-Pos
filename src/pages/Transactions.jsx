@@ -32,7 +32,8 @@ export default function Transactions() {
   const [reason, setReason] = useState("");
   const [reprint, setReprint] = useState(null);
   const toast = useToast();
-  const { settings } = useSettings();
+  const { settings, currentUser } = useSettings();
+  const voidedByName = currentUser?.name || (currentUser?.role === "admin" ? "Administrator" : "Staff");
 
   const load = useCallback(() => {
     api.sales(from, to).then(setSales).catch((e) => toast(errText(e), "err"));
@@ -42,10 +43,15 @@ export default function Transactions() {
 
   const doVoid = async () => {
     try {
-      await api.voidSale(voiding.id, reason.trim());
-      toast(`${voiding.receipt_no} voided — items returned to inventory`);
-      setVoiding(null); setReason(""); load();
-    } catch (e) { toast(errText(e), "err"); }
+      const who = voidedByName;
+      await api.voidSale(voiding.id, reason.trim(), who);
+      toast(`${voiding.receipt_no} voided by ${who} — items returned to inventory`);
+      setVoiding(null);
+      setReason("");
+      load();
+    } catch (e) {
+      toast(errText(e), "err");
+    }
   };
 
   const print = async (s) => {
@@ -88,7 +94,20 @@ export default function Transactions() {
                         </div>
                       </td>
                     </tr>
-                    {open[s.id] && <tr><td></td><td colSpan={5}><Items items={s.items} />{s.void_reason && <p className="muted">Void reason: {s.void_reason}</p>}</td></tr>}
+                    {open[s.id] && (
+                      <tr>
+                        <td></td>
+                        <td colSpan={5}>
+                          <Items items={s.items} />
+                          {s.status === "voided" && (
+                            <div style={{ marginTop: 8, padding: "8px 12px", background: "var(--card-solid)", borderRadius: 8, borderLeft: "3px solid var(--bad)" }}>
+                              <div>Voided by: <b>{s.voided_by || "—"}</b></div>
+                              {s.void_reason && <div className="muted" style={{ fontSize: 13, marginTop: 2 }}>Reason: {s.void_reason}</div>}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
                   </Fragment>
                 ))}
               </tbody>
@@ -96,13 +115,24 @@ export default function Transactions() {
           )
         ) : voided.length === 0 ? <Empty text="No voided sales in this period" /> : (
           <table>
-            <thead><tr><th>Receipt</th><th>Sold</th><th>Voided</th><th>Reason</th><th>Items</th><th className="num">Total</th></tr></thead>
+            <thead>
+              <tr>
+                <th>Receipt</th>
+                <th>Sold</th>
+                <th>Voided</th>
+                <th>Voided by</th>
+                <th>Reason</th>
+                <th>Items</th>
+                <th className="num">Total</th>
+              </tr>
+            </thead>
             <tbody>
               {voided.map((v) => (
                 <tr key={v.id} className="row-hover">
                   <td><b>{v.receipt_no}</b></td>
                   <td className="muted">{v.sold_at}</td>
                   <td className="muted">{v.voided_at}</td>
+                  <td><span className="badge" style={{ background: "rgba(236,63,142,0.15)", color: "var(--bad)" }}>{v.voided_by || "—"}</span></td>
                   <td>{v.reason || "—"}</td>
                   <td>{v.items.map((i) => `${i.quantity}× ${i.name}${i.variant_name ? ` (${i.variant_name})` : ""}`).join(", ")}</td>
                   <td className="num">{peso(v.total)}</td>
@@ -116,6 +146,9 @@ export default function Transactions() {
       {voiding && (
         <Modal title={`Void ${voiding.receipt_no}?`} onClose={() => setVoiding(null)}>
           <p className="muted">The items below return to inventory and this sale is saved in voided history.</p>
+          <div style={{ margin: "8px 0 12px 0", fontSize: 13 }}>
+            Voiding as: <b>{voidedByName}</b>
+          </div>
           <Items items={voiding.items} />
           <Field label="Reason (optional)"><input autoFocus value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. customer changed mind" /></Field>
           <button className="btn danger" onClick={doVoid}><Ban size={16} /> Confirm void · {peso(voiding.total)}</button>
