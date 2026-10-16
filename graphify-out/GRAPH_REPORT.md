@@ -1,22 +1,22 @@
 # Graph Report - Joy-Pos-Multiplatform  (2026-10-17)
 
 ## Corpus Check
-- 30 files · ~112,791 words
+- 30 files · ~113,053 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .icns 1, .ico 1)
 
 ## Summary
-- 246 nodes · 864 edges · 23 communities (14 shown, 9 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 13 edges (avg confidence: 0.85)
+- 251 nodes · 870 edges · 23 communities (13 shown, 10 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 13 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `fa504db2`
+- Built from commit: `3a8c0045`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- Field
+- PageErrorBoundary
 - package.json
 - printer.rs
 - tauri.conf.json
@@ -39,8 +39,8 @@
 3. `errText()` - 25 edges
 4. `peso()` - 24 edges
 5. `ymd()` - 24 edges
-6. `useToast()` - 23 edges
-7. `Empty()` - 23 edges
+6. `Empty()` - 23 edges
+7. `useToast()` - 23 edges
 8. `Field()` - 21 edges
 9. `PageHeader()` - 21 edges
 10. `rows()` - 20 edges
@@ -60,15 +60,11 @@
 ## Import Cycles
 - 2-file cycle: `src-tauri/src/cmds.rs -> src-tauri/src/printer.rs -> src-tauri/src/cmds.rs`
 
-## Communities (23 total, 9 thin omitted)
-
-### Community 0 - "Field"
-Cohesion: 0.83
-Nodes (3): Field(), blank(), Expenses()
+## Communities (23 total, 10 thin omitted)
 
 ### Community 1 - "package.json"
-Cohesion: 0.08
-Nodes (25): dependencies, lucide-react, react, react-dom, @tauri-apps/api, @tauri-apps/plugin-dialog, devDependencies, @tauri-apps/cli (+17 more)
+Cohesion: 0.07
+Nodes (26): dependencies, lucide-react, react, react-dom, @tauri-apps/api, @tauri-apps/plugin-dialog, devDependencies, @tauri-apps/cli (+18 more)
 
 ### Community 2 - "printer.rs"
 Cohesion: 0.21
@@ -79,12 +75,12 @@ Cohesion: 0.11
 Nodes (17): app, security, windows, build, beforeBuildCommand, beforeDevCommand, devUrl, frontendDist (+9 more)
 
 ### Community 4 - "ymd"
-Cohesion: 0.38
-Nodes (12): useSettings(), RangeBar(), ToastCtx, DEFAULT_CARD_ORDER, Dashboard(), Stat(), blank(), Salary() (+4 more)
+Cohesion: 0.42
+Nodes (11): PageHeader(), RangeBar(), ToastCtx, Dashboard(), Stat(), blank(), Expenses(), daysAgo() (+3 more)
 
 ### Community 5 - "App.jsx"
-Cohesion: 0.16
-Nodes (14): lucide-react, react, react-dom, api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx (+6 more)
+Cohesion: 0.18
+Nodes (13): lucide-react, react, api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx, PinLock() (+5 more)
 
 ### Community 7 - "db.rs"
 Cohesion: 0.15
@@ -111,8 +107,8 @@ Cohesion: 0.17
 Nodes (10): admin_dashboard(), create_branch(), dashboard(), end_day(), list_usb_devices(), now(), r2(), save_text_file() (+2 more)
 
 ### Community 19 - "Modal"
-Cohesion: 0.41
-Nodes (16): Empty(), Modal(), PageHeader(), Receipt(), useToast(), AdminDashboard(), Employees(), Inventory() (+8 more)
+Cohesion: 0.34
+Nodes (20): useSettings(), Empty(), Field(), Modal(), Receipt(), useToast(), AdminDashboard(), blank (+12 more)
 
 ### Community 23 - "Commissions.jsx"
 Cohesion: 0.83
@@ -120,21 +116,21 @@ Nodes (3): Commission(), CommissionBase(), LDCommission()
 
 ## Knowledge Gaps
 - **2 isolated node(s):** `@tauri-apps/cli`, `joyce-pos`
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 74 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 78 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `Db` connect `Db` to `Value`, `comm_args`, `cmds.rs`, `db.rs`?**
-  _High betweenness centrality (0.069) - this node is a cross-community bridge._
+  _High betweenness centrality (0.066) - this node is a cross-community bridge._
 - **What connects `@tauri-apps/cli`, `joyce-pos` to the rest of the system?**
   _2 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
-  _Cohesion score 0.07692307692307693 - nodes in this community are weakly interconnected._
-- **Why does `react` connect `App.jsx` to `Field`, `package.json`, `ymd`, `Modal`, `Commissions.jsx`?**
-  _High betweenness centrality (0.026) - this node is a cross-community bridge._
+  _Cohesion score 0.07407407407407407 - nodes in this community are weakly interconnected._
+- **Why does `react` connect `App.jsx` to `package.json`, `Modal`, `ymd`, `Commissions.jsx`?**
+  _High betweenness centrality (0.027) - this node is a cross-community bridge._
 - **Should `tauri.conf.json` be split into smaller, more focused modules?**
   _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._
-- **Why does `lucide-react` connect `App.jsx` to `Field`, `package.json`, `ymd`, `Modal`, `Commissions.jsx`?**
-  _High betweenness centrality (0.024) - this node is a cross-community bridge._
+- **Why does `lucide-react` connect `App.jsx` to `package.json`, `Modal`, `ymd`, `Commissions.jsx`?**
+  _High betweenness centrality (0.025) - this node is a cross-community bridge._

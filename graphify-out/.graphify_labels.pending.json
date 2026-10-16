@@ -1,5 +1,5 @@
 {
-  "0": "Field",
+  "0": "PageErrorBoundary",
   "1": "package.json",
   "2": "printer.rs",
   "3": "tauri.conf.json",
