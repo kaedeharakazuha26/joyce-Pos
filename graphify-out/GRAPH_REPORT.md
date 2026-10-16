@@ -1,22 +1,22 @@
 # Graph Report - Joy-Pos-Multiplatform  (2026-10-17)
 
 ## Corpus Check
-- 29 files · ~103,926 words
+- 30 files · ~107,548 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .icns 1, .ico 1)
 
 ## Summary
-- 238 nodes · 810 edges · 22 communities (14 shown, 8 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 12 edges (avg confidence: 0.85)
+- 244 nodes · 855 edges · 25 communities (16 shown, 9 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 13 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `4060a438`
+- Built from commit: `21961a87`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- cmds.rs
+- R
 - package.json
 - printer.rs
 - tauri.conf.json
@@ -30,20 +30,22 @@
 - joyce-pos
 - Value
 - comm_args
-- errText
+- cmds.rs
 - Modal
+- admin_dashboard
+- Commissions.jsx
 
 ## God Nodes (most connected - your core abstractions)
-1. `Db` - 53 edges
-2. `Modal()` - 23 edges
-3. `errText()` - 23 edges
-4. `ymd()` - 22 edges
-5. `peso()` - 22 edges
-6. `Empty()` - 21 edges
-7. `useToast()` - 21 edges
-8. `rows()` - 19 edges
-9. `Field()` - 19 edges
-10. `PageHeader()` - 19 edges
+1. `Db` - 55 edges
+2. `errText()` - 25 edges
+3. `Modal()` - 25 edges
+4. `peso()` - 24 edges
+5. `ymd()` - 24 edges
+6. `Empty()` - 23 edges
+7. `useToast()` - 23 edges
+8. `PageHeader()` - 21 edges
+9. `rows()` - 20 edges
+10. `Field()` - 19 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `send_usb()` --calls--> `e()`  [INFERRED]
@@ -60,11 +62,11 @@
 ## Import Cycles
 - 2-file cycle: `src-tauri/src/cmds.rs -> src-tauri/src/printer.rs -> src-tauri/src/cmds.rs`
 
-## Communities (22 total, 8 thin omitted)
+## Communities (25 total, 9 thin omitted)
 
-### Community 0 - "cmds.rs"
-Cohesion: 0.17
-Nodes (15): active_business_date(), business_now(), create_sale(), dashboard(), get_active_shift(), get_settings(), list_usb_devices(), load_settings() (+7 more)
+### Community 0 - "R"
+Cohesion: 0.43
+Nodes (7): get_settings(), list_usb_devices(), load_settings(), print_receipt(), print_test(), sale_detail(), void_sale()
 
 ### Community 1 - "package.json"
 Cohesion: 0.07
@@ -79,16 +81,16 @@ Cohesion: 0.11
 Nodes (17): app, security, windows, build, beforeBuildCommand, beforeDevCommand, devUrl, frontendDist (+9 more)
 
 ### Community 4 - "ymd"
-Cohesion: 0.44
-Nodes (10): RangeBar(), Commission(), CommissionBase(), LDCommission(), blank(), Expenses(), blank(), Salary() (+2 more)
+Cohesion: 0.46
+Nodes (10): RangeBar(), AdminDashboard(), blank(), Expenses(), blank(), Salary(), daysAgo(), monthStart() (+2 more)
 
 ### Community 5 - "App.jsx"
-Cohesion: 0.26
-Nodes (10): lucide-react, react, api, App(), NAV, SettingsCtx, PinLock(), ToastCtx (+2 more)
+Cohesion: 0.19
+Nodes (14): lucide-react, react, api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx, PinLock() (+6 more)
 
 ### Community 6 - "useToast"
-Cohesion: 0.38
-Nodes (9): useSettings(), Empty(), Receipt(), useToast(), POS(), ALL_PERMISSIONS, DEFAULTS, sample (+1 more)
+Cohesion: 0.49
+Nodes (8): useSettings(), Empty(), Receipt(), Dashboard(), Stat(), POS(), Settings(), errText()
 
 ### Community 7 - "db.rs"
 Cohesion: 0.15
@@ -96,7 +98,7 @@ Nodes (5): BranchConfig, BranchInfo, BranchState, init(), init_branch_state()
 
 ### Community 8 - "Db"
 Cohesion: 0.22
-Nodes (24): add_commission_type(), backup_db(), branch_info_json(), change_admin_pin(), create_branch(), delete_branch(), delete_cashier(), delete_commission() (+16 more)
+Nodes (16): add_commission_type(), backup_db(), change_admin_pin(), delete_cashier(), delete_commission(), delete_employee(), delete_expense(), delete_ld_commission() (+8 more)
 
 ### Community 9 - "default.json"
 Cohesion: 0.33
@@ -107,34 +109,42 @@ Cohesion: 0.26
 Nodes (14): list_cashiers(), list_commission_types(), list_commissions(), list_employees(), list_expenses(), list_ld_commissions(), list_products(), list_restocks() (+6 more)
 
 ### Community 17 - "comm_args"
-Cohesion: 0.29
-Nodes (10): comm_args(), num(), save_cashier(), save_commission(), save_employee(), save_expense(), save_ld_commission(), save_product() (+2 more)
+Cohesion: 0.22
+Nodes (14): active_business_date(), business_now(), comm_args(), get_active_shift(), num(), restock(), save_cashier(), save_commission() (+6 more)
 
-### Community 18 - "errText"
-Cohesion: 0.52
-Nodes (5): Dashboard(), Stat(), daysAgo(), errText(), pad()
+### Community 18 - "cmds.rs"
+Cohesion: 0.21
+Nodes (9): branch_info_json(), create_branch(), delete_branch(), end_day(), get_branch_info(), now(), set_storage_dir(), start_day() (+1 more)
 
 ### Community 19 - "Modal"
-Cohesion: 0.45
-Nodes (10): Field(), Modal(), PageHeader(), blank, Employees(), Inventory(), Products(), Items() (+2 more)
+Cohesion: 0.46
+Nodes (11): Field(), Modal(), PageHeader(), useToast(), blank, Employees(), Inventory(), Products() (+3 more)
+
+### Community 22 - "admin_dashboard"
+Cohesion: 0.33
+Nodes (5): admin_dashboard(), create_sale(), dashboard(), r2(), scalar()
+
+### Community 23 - "Commissions.jsx"
+Cohesion: 0.83
+Nodes (3): Commission(), CommissionBase(), LDCommission()
 
 ## Knowledge Gaps
 - **2 isolated node(s):** `@tauri-apps/cli`, `joyce-pos`
-  These have ≤1 connection - possible missing edges. (Counts symbols only; 71 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges. (Counts symbols only; 73 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Db` connect `Db` to `cmds.rs`, `Value`, `comm_args`, `db.rs`?**
-  _High betweenness centrality (0.071) - this node is a cross-community bridge._
+- **Why does `Db` connect `Db` to `R`, `db.rs`, `Value`, `comm_args`, `cmds.rs`, `admin_dashboard`?**
+  _High betweenness centrality (0.069) - this node is a cross-community bridge._
 - **What connects `@tauri-apps/cli`, `joyce-pos` to the rest of the system?**
   _2 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
-- **Why does `react` connect `App.jsx` to `package.json`, `ymd`, `useToast`, `errText`, `Modal`?**
+- **Why does `react` connect `App.jsx` to `package.json`, `ymd`, `useToast`, `Modal`, `Commissions.jsx`?**
   _High betweenness centrality (0.027) - this node is a cross-community bridge._
 - **Should `tauri.conf.json` be split into smaller, more focused modules?**
   _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._
-- **Why does `lucide-react` connect `App.jsx` to `package.json`, `ymd`, `useToast`, `errText`, `Modal`?**
+- **Why does `lucide-react` connect `App.jsx` to `package.json`, `ymd`, `useToast`, `Modal`, `Commissions.jsx`?**
   _High betweenness centrality (0.025) - this node is a cross-community bridge._

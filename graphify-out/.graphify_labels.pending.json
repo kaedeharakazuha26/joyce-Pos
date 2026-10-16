@@ -1,5 +1,5 @@
 {
-  "0": "cmds.rs",
+  "0": "R",
   "1": "package.json",
   "2": "printer.rs",
   "3": "tauri.conf.json",
@@ -17,8 +17,11 @@
   "15": "Value",
   "16": "Value",
   "17": "comm_args",
-  "18": "errText",
+  "18": "cmds.rs",
   "19": "Modal",
   "20": "R",
-  "21": "Value"
+  "21": "Value",
+  "22": "admin_dashboard",
+  "23": "Commissions.jsx",
+  "24": "Connection"
 }
