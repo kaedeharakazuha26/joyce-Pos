@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Delete, KeyRound, Lock, ShieldCheck } from "lucide-react";
+import { Delete, Lock } from "lucide-react";
 import { api } from "../api";
 import { errText } from "../utils";
 
@@ -9,7 +9,10 @@ export default function PinLock({ onUnlock }) {
   const [loading, setLoading] = useState(false);
 
   const submit = async (p = pin) => {
-    if (!p) return;
+    if (!p || p.length < 4) {
+      setErr("PIN must be at least 4 digits");
+      return;
+    }
     setLoading(true);
     setErr("");
     try {
@@ -25,14 +28,9 @@ export default function PinLock({ onUnlock }) {
 
   const press = (digit) => {
     if (loading) return;
-    if (pin.length < 8) {
-      const next = pin + digit;
-      setPin(next);
+    if (pin.length < 10) {
+      setPin((prev) => prev + digit);
       setErr("");
-      if (next.length === 4) {
-        // Auto-check on 4 digits
-        submit(next);
-      }
     }
   };
 
@@ -65,6 +63,7 @@ export default function PinLock({ onUnlock }) {
   }, [pin, loading]);
 
   const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"];
+  const dotCount = Math.max(6, pin.length);
 
   return (
     <div className="pin-lock-overlay">
@@ -78,15 +77,14 @@ export default function PinLock({ onUnlock }) {
         </div>
 
         <p className="muted" style={{ textAlign: "center", marginBottom: 18, fontSize: 13 }}>
-          Enter PIN to unlock (Default admin PIN: <b>0000</b>)
+          Enter your 4 to 8 digit PIN to unlock
         </p>
 
         {/* PIN indicator dots */}
         <div className={"pin-dots" + (err ? " shake" : "")}>
-          {[0, 1, 2, 3].map((i) => (
+          {Array.from({ length: dotCount }).map((_, i) => (
             <span key={i} className={"pin-dot" + (pin.length > i ? " filled" : "")} />
           ))}
-          {pin.length > 4 && <span className="pin-more">+{pin.length - 4}</span>}
         </div>
 
         {err && <div className="pin-error">{err}</div>}
@@ -115,7 +113,7 @@ export default function PinLock({ onUnlock }) {
           className="btn"
           style={{ width: "100%", marginTop: 16 }}
           onClick={() => submit(pin)}
-          disabled={!pin || loading}
+          disabled={pin.length < 4 || loading}
         >
           <Lock size={16} /> {loading ? "Verifying…" : "Unlock Terminal"}
         </button>
