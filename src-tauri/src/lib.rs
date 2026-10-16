@@ -12,9 +12,11 @@ pub fn run() {
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
-            let conn = rusqlite::Connection::open(dir.join("joyce_pos.db"))?;
+            let branch_state = db::init_branch_state(dir)?;
+            let active_db_path = branch_state.active_db_path();
+            let conn = rusqlite::Connection::open(&active_db_path)?;
             db::init(&conn)?;
-            app.manage(db::Db(Mutex::new(conn)));
+            app.manage(db::Db(Mutex::new(conn), Mutex::new(branch_state)));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -57,6 +59,11 @@ pub fn run() {
             cmds::list_cashiers,
             cmds::save_cashier,
             cmds::delete_cashier,
+            cmds::get_branch_info,
+            cmds::switch_branch,
+            cmds::create_branch,
+            cmds::delete_branch,
+            cmds::set_storage_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running JOYCE POS");

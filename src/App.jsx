@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { LayoutDashboard, ShoppingCart, History, Package, Boxes, Receipt as ReceiptIcon, Wallet, Users, Coins, Smartphone, Settings as Cog, LogOut } from "lucide-react";
-import { ToastProvider } from "./components/ui";
+import { LayoutDashboard, ShoppingCart, History, Package, Boxes, Receipt as ReceiptIcon, Wallet, Users, Coins, Smartphone, Settings as Cog, LogOut, Store, Plus } from "lucide-react";
+import { ToastProvider, Modal, Field } from "./components/ui";
 import { api } from "./api";
 import PinLock from "./components/PinLock";
 import Dashboard from "./pages/Dashboard";
@@ -14,7 +14,14 @@ import { Commission, LDCommission } from "./pages/Commissions";
 import Employees from "./pages/Employees";
 import Settings from "./pages/Settings";
 
-const SettingsCtx = createContext({ settings: {}, save: async () => { }, currentUser: null });
+const SettingsCtx = createContext({
+  settings: {},
+  save: async () => { },
+  currentUser: null,
+  branchInfo: null,
+  refreshBranchInfo: async () => { },
+  handleSwitchBranch: async () => { },
+});
 export const useSettings = () => useContext(SettingsCtx);
 
 const NAV = [
@@ -43,6 +50,12 @@ export default function App() {
     }
   });
 
+  const [branchInfo, setBranchInfo] = useState(null);
+  const [branchKey, setBranchKey] = useState(0);
+  const [showAddBranch, setShowAddBranch] = useState(false);
+  const [newBranchName, setNewBranchName] = useState("");
+  const [creatingBranch, setCreatingBranch] = useState(false);
+
   const applyTheme = (t) => {
     document.documentElement.dataset.theme = t;
     localStorage.setItem("joyce-theme", t);
@@ -52,6 +65,19 @@ export default function App() {
     applyTheme(localStorage.getItem("joyce-theme") || "dark");
     api.getSettings().then((s) => { setSettings(s); if (s.theme) applyTheme(s.theme); }).catch(() => { });
   }, []);
+
+  const loadBranchInfo = useCallback(async () => {
+    try {
+      const info = await api.getBranchInfo();
+      setBranchInfo(info);
+    } catch (e) {
+      console.error("Failed to load branch info", e);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBranchInfo();
+  }, [loadBranchInfo]);
 
   const save = useCallback(async (values) => {
     await api.setSettings(values);
@@ -67,6 +93,32 @@ export default function App() {
   const handleLogout = () => {
     sessionStorage.removeItem("joyce-user");
     setCurrentUser(null);
+  };
+
+  const handleSwitchBranch = async (branchId) => {
+    try {
+      const info = await api.switchBranch(branchId);
+      setBranchInfo(info);
+      setBranchKey((k) => k + 1);
+    } catch (e) {
+      alert("Failed to switch branch: " + e);
+    }
+  };
+
+  const handleCreateBranch = async () => {
+    if (!newBranchName.trim()) return;
+    setCreatingBranch(true);
+    try {
+      const info = await api.createBranch(newBranchName.trim());
+      setBranchInfo(info);
+      setBranchKey((k) => k + 1);
+      setShowAddBranch(false);
+      setNewBranchName("");
+    } catch (e) {
+      alert("Failed to create branch: " + e);
+    } finally {
+      setCreatingBranch(false);
+    }
   };
 
   const allowedNav = NAV.filter((item) => {
@@ -91,7 +143,16 @@ export default function App() {
 
   return (
     <ToastProvider>
-      <SettingsCtx.Provider value={{ settings, save, currentUser }}>
+      <SettingsCtx.Provider
+        value={{
+          settings,
+          save,
+          currentUser,
+          branchInfo,
+          refreshBranchInfo: loadBranchInfo,
+          handleSwitchBranch,
+        }}
+      >
         {!currentUser ? (
           <PinLock onUnlock={handleUnlock} />
         ) : (
@@ -101,6 +162,34 @@ export default function App() {
                 <img src="/logo.png" alt="JOYCE POS logo" />
                 <div><b>JOYCE POS</b><small></small></div>
               </div>
+
+              {/* Branch switcher dropdown with plus icon below JOYCE POS */}
+              <div className="branch-bar">
+                <div className="branch-selector">
+                  <Store size={15} className="branch-icon" />
+                  <select
+                    id="branch-select"
+                    value={branchInfo?.active_branch || "main"}
+                    onChange={(e) => handleSwitchBranch(e.target.value)}
+                    title="Switch active store branch"
+                  >
+                    {(branchInfo?.branches || [{ id: "main", name: "Main Store" }]).map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  className="btn-icon branch-add-btn"
+                  title="Create new branch"
+                  onClick={() => setShowAddBranch(true)}
+                >
+                  <Plus size={15} />
+                </button>
+              </div>
+
               <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, overflowY: "auto" }}>
                 {allowedNav.map(({ id, label, icon: Icon }) => (
                   <button key={id} id={`nav-${id}`} className={"nav-btn" + (tab === id ? " active" : "")} onClick={() => setTab(id)}>
@@ -126,9 +215,37 @@ export default function App() {
                 </div>
               </div>
             </aside>
-            <main className={"main" + (tab === "pos" ? " pos-main" : "")} key={tab}>
+            <main className={"main" + (tab === "pos" ? " pos-main" : "")} key={`${tab}-${branchKey}`}>
               {Page ? <Page /> : <div className="empty">No access to this section.</div>}
             </main>
+
+            {showAddBranch && (
+              <Modal title="Create New Branch" onClose={() => setShowAddBranch(false)}>
+                <p className="muted" style={{ marginBottom: 14, fontSize: 13 }}>
+                  Creates an isolated database for this location. Point your Database Storage Folder to Google Drive in Settings to sync sales across branches.
+                </p>
+                <Field label="Branch Name">
+                  <input
+                    autoFocus
+                    value={newBranchName}
+                    onChange={(e) => setNewBranchName(e.target.value)}
+                    placeholder="e.g. Taguig Branch, Downtown Branch"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newBranchName.trim()) handleCreateBranch();
+                    }}
+                  />
+                </Field>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{ width: "100%", marginTop: 8 }}
+                  disabled={!newBranchName.trim() || creatingBranch}
+                  onClick={handleCreateBranch}
+                >
+                  <Plus size={16} /> {creatingBranch ? "Creating…" : "Create & Switch Branch"}
+                </button>
+              </Modal>
+            )}
           </div>
         )}
       </SettingsCtx.Provider>

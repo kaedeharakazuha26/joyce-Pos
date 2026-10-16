@@ -452,6 +452,68 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   cursor: pointer;
 }
 
+/* ── Branch Switcher in Sidebar ── */
+.branch-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+.branch-selector {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0 8px;
+  transition: all 0.15s ease;
+  min-width: 0;
+}
+.branch-selector:hover {
+  border-color: var(--accent);
+}
+.branch-icon {
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-right: 6px;
+}
+.branch-selector select {
+  flex: 1;
+  background: transparent !important;
+  border: 0 !important;
+  padding: 7px 2px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--text) !important;
+  cursor: pointer;
+  outline: none;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.branch-add-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+.branch-add-btn:hover {
+  background: var(--grad);
+  color: #fff;
+  border-color: transparent;
+  transform: scale(1.05);
+}
+
 @media print {
   body * { visibility: hidden; }
   #receipt-print, #receipt-print * { visibility: visible; }

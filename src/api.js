@@ -46,4 +46,9 @@ export const api = {
   cashiers: () => call("list_cashiers"),
   saveCashier: (cashier) => call("save_cashier", { cashier }),
   deleteCashier: (id) => call("delete_cashier", { id }),
+  getBranchInfo: () => call("get_branch_info"),
+  switchBranch: (branchId) => call("switch_branch", { branchId }),
+  createBranch: (name) => call("create_branch", { name }),
+  deleteBranch: (branchId) => call("delete_branch", { branchId }),
+  setStorageDir: (storageDir) => call("set_storage_dir", { storageDir }),
 };

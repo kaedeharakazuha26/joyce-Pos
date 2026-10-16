@@ -716,3 +716,150 @@ pub fn delete_cashier(db: State<Db>, id: i64) -> R<()> {
     Ok(())
 }
 
+// ───────────────────────── Branches & Multi-Location ─────────────────────────
+
+fn branch_info_json(db: &Db) -> R<Value> {
+    let bs = db.1.lock().map_err(e)?;
+    let active_path = bs.active_db_path();
+    Ok(json!({
+        "active_branch": bs.config.active_branch,
+        "storage_dir": bs.config.storage_dir,
+        "default_dir": bs.default_dir.to_string_lossy(),
+        "active_db_path": active_path.to_string_lossy(),
+        "branches": bs.config.branches,
+    }))
+}
+
+#[tauri::command]
+pub fn get_branch_info(db: State<Db>) -> R<Value> {
+    branch_info_json(&db)
+}
+
+#[tauri::command]
+pub fn switch_branch(db: State<Db>, branch_id: String) -> R<Value> {
+    let new_path = {
+        let mut bs = db.1.lock().map_err(e)?;
+        if !bs.config.branches.iter().any(|b| b.id == branch_id) {
+            return Err("Branch not found".into());
+        }
+        bs.config.active_branch = branch_id;
+        bs.save().map_err(e)?;
+        bs.active_db_path()
+    };
+
+    {
+        let mut c = db.0.lock().map_err(e)?;
+        *c = Connection::open(&new_path).map_err(e)?;
+        crate::db::init(&c).map_err(e)?;
+    }
+
+    branch_info_json(&db)
+}
+
+#[tauri::command]
+pub fn create_branch(db: State<Db>, name: String) -> R<Value> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("Branch name is required".into());
+    }
+
+    let (_branch_id, new_path) = {
+        let mut bs = db.1.lock().map_err(e)?;
+        let safe_name: String = name
+            .to_lowercase()
+            .chars()
+            .map(|ch| if ch.is_alphanumeric() { ch } else { '_' })
+            .collect();
+        let timestamp = chrono::Local::now().format("%s").to_string();
+        let branch_id = format!("branch_{}_{}", safe_name.trim_matches('_'), &timestamp[timestamp.len().saturating_sub(4)..]);
+        let file = format!("joyce_pos_{}.db", branch_id);
+        let path = bs.active_base_dir().join(&file);
+
+        let info = crate::db::BranchInfo {
+            id: branch_id.clone(),
+            name: name.to_string(),
+            file,
+            created_at: now(),
+        };
+
+        bs.config.branches.push(info);
+        bs.config.active_branch = branch_id.clone();
+        bs.save().map_err(e)?;
+        (branch_id, path)
+    };
+
+    {
+        let mut c = db.0.lock().map_err(e)?;
+        *c = Connection::open(&new_path).map_err(e)?;
+        crate::db::init(&c).map_err(e)?;
+    }
+
+    branch_info_json(&db)
+}
+
+#[tauri::command]
+pub fn delete_branch(db: State<Db>, branch_id: String) -> R<Value> {
+    let should_switch = {
+        let mut bs = db.1.lock().map_err(e)?;
+        if bs.config.branches.len() <= 1 {
+            return Err("Cannot delete the only remaining branch".into());
+        }
+        if branch_id == "main" {
+            return Err("Cannot delete the main branch".into());
+        }
+        let pos = bs
+            .config
+            .branches
+            .iter()
+            .position(|b| b.id == branch_id)
+            .ok_or_else(|| "Branch not found".to_string())?;
+        bs.config.branches.remove(pos);
+
+        let was_active = bs.config.active_branch == branch_id;
+        if was_active {
+            bs.config.active_branch = bs.config.branches[0].id.clone();
+        }
+        bs.save().map_err(e)?;
+        if was_active {
+            Some(bs.active_db_path())
+        } else {
+            None
+        }
+    };
+
+    if let Some(path) = should_switch {
+        let mut c = db.0.lock().map_err(e)?;
+        *c = Connection::open(&path).map_err(e)?;
+        crate::db::init(&c).map_err(e)?;
+    }
+
+    branch_info_json(&db)
+}
+
+#[tauri::command]
+pub fn set_storage_dir(db: State<Db>, storage_dir: String) -> R<Value> {
+    let storage_dir = storage_dir.trim().to_string();
+    if !storage_dir.is_empty() {
+        let p = std::path::Path::new(&storage_dir);
+        if !p.exists() {
+            std::fs::create_dir_all(p).map_err(|e| format!("Failed to create folder: {}", e))?;
+        }
+    }
+
+    let active_path = {
+        let mut bs = db.1.lock().map_err(e)?;
+        bs.config.storage_dir = storage_dir;
+        bs.save().map_err(e)?;
+        bs.active_db_path()
+    };
+
+    {
+        let mut c = db.0.lock().map_err(e)?;
+        *c = Connection::open(&active_path).map_err(e)?;
+        crate::db::init(&c).map_err(e)?;
+    }
+
+    branch_info_json(&db)
+}
+
+

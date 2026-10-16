@@ -13,6 +13,10 @@ import {
   Pencil,
   Trash2,
   Lock,
+  Cloud,
+  FolderOpen,
+  Store,
+  Info,
 } from "lucide-react";
 import { save as saveDialog, open as openDialog } from "@tauri-apps/plugin-dialog";
 import { api } from "../api";
@@ -72,13 +76,16 @@ const sample = {
 };
 
 export default function Settings() {
-  const { settings, save } = useSettings();
+  const { settings, save, branchInfo, refreshBranchInfo, handleSwitchBranch } = useSettings();
   const [s, setS] = useState({ ...DEFAULTS, ...settings });
   const [usb, setUsb] = useState([]);
   const [tab, setTab] = useState("general");
   const [cashiersList, setCashiersList] = useState([]);
   const [adminPinForm, setAdminPinForm] = useState({ oldPin: "", newPin: "", confirmPin: "" });
   const [cashierModal, setCashierModal] = useState(null); // null or cashier object
+  const [newBranchModal, setNewBranchModal] = useState(false);
+  const [newBranchName, setNewBranchName] = useState("");
+  const [creatingBranch, setCreatingBranch] = useState(false);
   const toast = useToast();
 
   useEffect(() => {
@@ -210,8 +217,63 @@ export default function Settings() {
     }
   };
 
+  const handlePickStorageDir = async () => {
+    try {
+      const selected = await openDialog({
+        directory: true,
+        title: "Select Google Drive Synced Folder",
+      });
+      if (selected) {
+        await api.setStorageDir(selected);
+        await refreshBranchInfo();
+        toast("Database folder updated to Google Drive folder!");
+      }
+    } catch (e) {
+      toast(errText(e), "err");
+    }
+  };
+
+  const handleResetStorageDir = async () => {
+    if (!confirm("Reset database location to default local app folder?")) return;
+    try {
+      await api.setStorageDir("");
+      await refreshBranchInfo();
+      toast("Reset to default local folder");
+    } catch (e) {
+      toast(errText(e), "err");
+    }
+  };
+
+  const handleDeleteBranch = async (id, name) => {
+    if (!confirm(`Delete branch "${name}" from list? The .db file will stay safely on disk.`)) return;
+    try {
+      await api.deleteBranch(id);
+      await refreshBranchInfo();
+      toast(`Branch "${name}" deleted`);
+    } catch (e) {
+      toast(errText(e), "err");
+    }
+  };
+
+  const submitCreateBranch = async () => {
+    if (!newBranchName.trim()) return;
+    setCreatingBranch(true);
+    try {
+      await api.createBranch(newBranchName.trim());
+      await refreshBranchInfo();
+      toast(`Branch "${newBranchName.trim()}" created`);
+      setNewBranchName("");
+      setNewBranchModal(false);
+    } catch (e) {
+      toast(errText(e), "err");
+    } finally {
+      setCreatingBranch(false);
+    }
+  };
+
   const tabs = [
     ["general", "Appearance & Data"],
+    ["branches", "Branches & Google Drive"],
     ["security", "Security & Cashiers"],
     ["printer", "Printer"],
     ["receipt", "Receipt"],
@@ -219,8 +281,8 @@ export default function Settings() {
 
   return (
     <>
-      <PageHeader title="Settings" subtitle="Appearance, security, cashiers, printing">
-        {tab !== "general" && tab !== "security" && (
+      <PageHeader title="Settings" subtitle="Appearance, branches, security, cashiers, printing">
+        {tab !== "general" && tab !== "security" && tab !== "branches" && (
           <button className="btn" onClick={persist}>
             Save settings
           </button>
@@ -280,6 +342,128 @@ export default function Settings() {
                 <DatabaseZap size={17} /> Restore database
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "branches" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {/* Google Drive Location Card */}
+          <div className="card">
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+              <Cloud size={22} color="var(--accent)" />
+              <h3 style={{ margin: 0 }}>Google Drive & Database Location</h3>
+            </div>
+            <p className="muted" style={{ marginBottom: 16 }}>
+              Point the database storage folder to your local <b>Google Drive synced folder</b> (e.g. <code>Google Drive/JOYCE_POS</code>) to automatically sync sales from branch stores to the office in real-time.
+            </p>
+
+            <div style={{ padding: 14, background: "var(--card-solid)", borderRadius: 10, border: "1px solid var(--border)", marginBottom: 16 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>CURRENT STORAGE FOLDER</span>
+                <span className={"badge " + (branchInfo?.storage_dir ? "ok" : "warn")}>
+                  {branchInfo?.storage_dir ? "☁️ Google Drive / Custom Folder" : "💻 Local Default Storage"}
+                </span>
+              </div>
+              <code style={{ display: "block", wordBreak: "break-all", fontSize: 13, color: "var(--text)" }}>
+                {branchInfo?.storage_dir || branchInfo?.default_dir || "Loading directory…"}
+              </code>
+              <div style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
+                Active Database: <b>{branchInfo?.active_db_path?.split("/").pop() || "joyce_pos.db"}</b>
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <button className="btn" onClick={handlePickStorageDir}>
+                <FolderOpen size={16} /> Choose Google Drive Folder
+              </button>
+              {branchInfo?.storage_dir && (
+                <button className="btn ghost" onClick={handleResetStorageDir}>
+                  Reset to Local Storage
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Branches List Card */}
+          <div className="card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <div>
+                <h3 style={{ margin: 0 }}>Store Branches</h3>
+                <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+                  Each branch saves to its own separate database file so different store locations never collide or corrupt each other.
+                </p>
+              </div>
+              <button className="btn sm" onClick={() => setNewBranchModal(true)}>
+                <Plus size={15} /> Add Branch
+              </button>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Branch Name</th>
+                  <th>Database File</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(branchInfo?.branches || []).map((b) => {
+                  const isActive = b.id === branchInfo?.active_branch;
+                  return (
+                    <tr key={b.id} className="row-hover">
+                      <td>
+                        <b>{b.name}</b>
+                        {b.id === "main" && <span className="muted" style={{ fontSize: 11, marginLeft: 6 }}>(Default)</span>}
+                      </td>
+                      <td>
+                        <code style={{ fontSize: 12 }}>{b.file}</code>
+                      </td>
+                      <td>
+                        {isActive ? (
+                          <span className="badge ok">Active</span>
+                        ) : (
+                          <button
+                            className="btn ghost sm"
+                            onClick={() => handleSwitchBranch(b.id)}
+                            style={{ padding: "4px 10px" }}
+                          >
+                            Switch to this
+                          </button>
+                        )}
+                      </td>
+                      <td>
+                        {b.id !== "main" && (branchInfo?.branches || []).length > 1 && (
+                          <button
+                            className="icon-btn"
+                            title="Delete branch"
+                            onClick={() => handleDeleteBranch(b.id, b.name)}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Google Drive Guide Card */}
+          <div className="card">
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <Info size={18} color="var(--accent)" />
+              <h4 style={{ margin: 0 }}>How Google Drive Multi-Area Sync Works</h4>
+            </div>
+            <ol style={{ paddingLeft: 20, margin: 0, fontSize: 13, lineHeight: "1.7", color: "var(--muted)" }}>
+              <li>Install <b>Google Drive for Desktop</b> on your Office PC and branch POS terminals.</li>
+              <li>Create a shared folder in Google Drive (e.g. <code>My Drive/JOYCE_POS_DATA</code>).</li>
+              <li>On all computers, click <b>"Choose Google Drive Folder"</b> above and select that folder.</li>
+              <li>Each branch operates in its own dedicated database (e.g. <code>joyce_pos_taguig.db</code>), avoiding SQLite locking issues.</li>
+              <li>At the office, the admin can switch between branches in the top-left dropdown to review sales, inventory, and highest employee income in real-time!</li>
+            </ol>
           </div>
         </div>
       )}
@@ -426,6 +610,35 @@ export default function Settings() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Create Branch Modal */}
+      {newBranchModal && (
+        <Modal title="Create New Branch" onClose={() => setNewBranchModal(false)}>
+          <p className="muted" style={{ marginBottom: 14, fontSize: 13 }}>
+            Creates a separate database for this location. Point your Database Storage Folder to Google Drive to sync sales from all branches.
+          </p>
+          <Field label="Branch Name">
+            <input
+              autoFocus
+              value={newBranchName}
+              onChange={(e) => setNewBranchName(e.target.value)}
+              placeholder="e.g. Taguig Branch, Downtown Branch"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newBranchName.trim()) submitCreateBranch();
+              }}
+            />
+          </Field>
+          <button
+            type="button"
+            className="btn"
+            style={{ width: "100%", marginTop: 8 }}
+            disabled={!newBranchName.trim() || creatingBranch}
+            onClick={submitCreateBranch}
+          >
+            <Plus size={16} /> {creatingBranch ? "Creating…" : "Create & Switch Branch"}
+          </button>
+        </Modal>
       )}
 
       {/* Cashier Modal */}

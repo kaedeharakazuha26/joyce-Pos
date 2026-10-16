@@ -1,7 +1,121 @@
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Mutex;
 
-pub struct Db(pub Mutex<Connection>);
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BranchInfo {
+    pub id: String,
+    pub name: String,
+    pub file: String,
+    pub created_at: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct BranchConfig {
+    pub active_branch: String,
+    pub storage_dir: String, // empty string means default app_data_dir
+    pub branches: Vec<BranchInfo>,
+}
+
+pub struct BranchState {
+    pub default_dir: PathBuf,
+    pub config: BranchConfig,
+}
+
+impl BranchState {
+    pub fn config_file(&self) -> PathBuf {
+        self.default_dir.join("branches.json")
+    }
+
+    pub fn save(&self) -> Result<(), String> {
+        let json = serde_json::to_string_pretty(&self.config).map_err(|e| e.to_string())?;
+        std::fs::write(self.config_file(), json).map_err(|e| e.to_string())
+    }
+
+    pub fn active_base_dir(&self) -> PathBuf {
+        if !self.config.storage_dir.trim().is_empty() {
+            let p = PathBuf::from(self.config.storage_dir.trim());
+            if p.exists() || std::fs::create_dir_all(&p).is_ok() {
+                return p;
+            }
+        }
+        self.default_dir.clone()
+    }
+
+    pub fn active_db_path(&self) -> PathBuf {
+        let base = self.active_base_dir();
+        let branch = self
+            .config
+            .branches
+            .iter()
+            .find(|b| b.id == self.config.active_branch)
+            .or_else(|| self.config.branches.first());
+        let file = branch.map(|b| b.file.as_str()).unwrap_or("joyce_pos.db");
+        base.join(file)
+    }
+
+    #[allow(dead_code)]
+    pub fn branch_db_path(&self, branch_id: &str) -> Option<PathBuf> {
+        let base = self.active_base_dir();
+        let branch = self.config.branches.iter().find(|b| b.id == branch_id)?;
+        Some(base.join(&branch.file))
+    }
+}
+
+pub fn init_branch_state(default_dir: PathBuf) -> Result<BranchState, String> {
+    let cfg_path = default_dir.join("branches.json");
+    let mut config = if cfg_path.exists() {
+        match std::fs::read_to_string(&cfg_path) {
+            Ok(content) => serde_json::from_str::<BranchConfig>(&content).unwrap_or_else(|_| BranchConfig {
+                active_branch: "main".into(),
+                storage_dir: "".into(),
+                branches: vec![BranchInfo {
+                    id: "main".into(),
+                    name: "Main Store".into(),
+                    file: "joyce_pos.db".into(),
+                    created_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                }],
+            }),
+            Err(_) => BranchConfig {
+                active_branch: "main".into(),
+                storage_dir: "".into(),
+                branches: vec![BranchInfo {
+                    id: "main".into(),
+                    name: "Main Store".into(),
+                    file: "joyce_pos.db".into(),
+                    created_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                }],
+            },
+        }
+    } else {
+        BranchConfig {
+            active_branch: "main".into(),
+            storage_dir: "".into(),
+            branches: vec![BranchInfo {
+                id: "main".into(),
+                name: "Main Store".into(),
+                file: "joyce_pos.db".into(),
+                created_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            }],
+        }
+    };
+
+    if config.branches.is_empty() {
+        config.branches.push(BranchInfo {
+            id: "main".into(),
+            name: "Main Store".into(),
+            file: "joyce_pos.db".into(),
+            created_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+        });
+    }
+
+    let state = BranchState { default_dir, config };
+    let _ = state.save();
+    Ok(state)
+}
+
+pub struct Db(pub Mutex<Connection>, pub Mutex<BranchState>);
 
 /// Creates all tables if they don't exist yet. Safe to run on every start / after restore.
 pub fn init(conn: &Connection) -> rusqlite::Result<()> {
