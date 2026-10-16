@@ -52,6 +52,11 @@ pub fn run() {
             cmds::print_receipt,
             cmds::print_test,
             cmds::list_usb_devices,
+            cmds::verify_pin,
+            cmds::change_admin_pin,
+            cmds::list_cashiers,
+            cmds::save_cashier,
+            cmds::delete_cashier,
         ])
         .run(tauri::generate_context!())
         .expect("error while running JOYCE POS");

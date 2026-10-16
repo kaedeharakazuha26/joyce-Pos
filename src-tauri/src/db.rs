@@ -19,6 +19,7 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             cost REAL NOT NULL DEFAULT 0,       -- cost of 1 base unit
             stock INTEGER NOT NULL DEFAULT 0,   -- in base units
             low_stock INTEGER NOT NULL DEFAULT 5,
+            image TEXT NOT NULL DEFAULT '',
             active INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL
         );
@@ -133,6 +134,14 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             amount REAL NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS cashiers(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            pin TEXT NOT NULL UNIQUE,
+            permissions TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS settings(
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -145,7 +154,9 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
     )?;
 
     // Safe column migrations for existing databases
+    let _ = conn.execute("ALTER TABLE products ADD COLUMN image TEXT NOT NULL DEFAULT ''", []);
     let _ = conn.execute("ALTER TABLE ld_commissions ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1", []);
+    let _ = conn.execute("INSERT OR IGNORE INTO settings(key, value) VALUES('admin_pin', '0000')", []);
 
     Ok(())
 }

@@ -79,16 +79,16 @@ pub fn save_product(db: State<Db>, product: Value) -> R<i64> {
     let id = match product.get("id").and_then(|x| x.as_i64()) {
         Some(id) => {
             tx.execute(
-                "UPDATE products SET name=?,barcode=?,category=?,price=?,cost=?,low_stock=? WHERE id=?",
-                params![name, text(&product, "barcode"), text(&product, "category"), num(&product, "price"), num(&product, "cost"), num(&product, "low_stock") as i64, id],
+                "UPDATE products SET name=?,barcode=?,category=?,price=?,cost=?,low_stock=?,image=? WHERE id=?",
+                params![name, text(&product, "barcode"), text(&product, "category"), num(&product, "price"), num(&product, "cost"), num(&product, "low_stock") as i64, text(&product, "image"), id],
             )
             .map_err(e)?;
             id
         }
         None => {
             tx.execute(
-                "INSERT INTO products(name,barcode,category,price,cost,stock,low_stock,created_at) VALUES(?,?,?,?,?,?,?,?)",
-                params![name, text(&product, "barcode"), text(&product, "category"), num(&product, "price"), num(&product, "cost"), num(&product, "stock") as i64, num(&product, "low_stock") as i64, now()],
+                "INSERT INTO products(name,barcode,category,price,cost,stock,low_stock,image,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
+                params![name, text(&product, "barcode"), text(&product, "category"), num(&product, "price"), num(&product, "cost"), num(&product, "stock") as i64, num(&product, "low_stock") as i64, text(&product, "image"), now()],
             )
             .map_err(e)?;
             tx.last_insert_rowid()
@@ -472,12 +472,41 @@ pub fn dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
     let voided_n = scalar(&c, "SELECT COUNT(*) FROM voided_sales WHERE date(voided_at) BETWEEN ?1 AND ?2", p);
     let expenses = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM expenses WHERE date BETWEEN ?1 AND ?2", p);
     let salaries = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM salaries WHERE date BETWEEN ?1 AND ?2", p);
+    let commissions = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM commissions WHERE date BETWEEN ?1 AND ?2", p);
+    let ld_commissions = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM ld_commissions WHERE date BETWEEN ?1 AND ?2", p);
     let gross = revenue - cogs;
+    let net = gross - expenses - salaries - commissions - ld_commissions;
+
+    let top_employees = rows(
+        &c,
+        r#"
+        SELECT employee_name,
+               ROUND(SUM(amount), 2) AS total,
+               ROUND(SUM(CASE WHEN src='salary' THEN amount ELSE 0 END), 2) AS salary,
+               ROUND(SUM(CASE WHEN src='commission' THEN amount ELSE 0 END), 2) AS commission,
+               ROUND(SUM(CASE WHEN src='ld' THEN amount ELSE 0 END), 2) AS ld_commission
+        FROM (
+            SELECT employee AS employee_name, amount, 'salary' AS src FROM salaries WHERE date BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT employee_name, amount, 'commission' AS src FROM commissions WHERE date BETWEEN ?1 AND ?2
+            UNION ALL
+            SELECT employee_name, amount, 'ld' AS src FROM ld_commissions WHERE date BETWEEN ?1 AND ?2
+        )
+        WHERE employee_name != ''
+        GROUP BY employee_name
+        ORDER BY total DESC
+        LIMIT 6
+        "#,
+        p,
+    )?;
+
     Ok(json!({
         "revenue": r2(revenue), "orders": count, "cogs": r2(cogs), "gross_profit": r2(gross),
         "voided_total": r2(voided), "voided_count": voided_n,
         "expenses": r2(expenses), "salaries": r2(salaries),
-        "net_profit": r2(gross - expenses - salaries),
+        "commissions": r2(commissions), "ld_commissions": r2(ld_commissions),
+        "net_profit": r2(net),
+        "top_employees": top_employees,
         "inventory_cost": r2(scalar(&c, "SELECT COALESCE(SUM(stock*cost),0) FROM products WHERE active=1", &[])),
         "inventory_retail": r2(scalar(&c, "SELECT COALESCE(SUM(stock*price),0) FROM products WHERE active=1", &[])),
         "daily": rows(&c, &format!("SELECT date(created_at) AS day, SUM(total) AS total, COUNT(*) AS count FROM sales WHERE {range} GROUP BY day ORDER BY day"), p)?,
@@ -565,3 +594,124 @@ pub fn print_test(db: State<Db>) -> R<()> {
 pub fn list_usb_devices() -> R<Vec<Value>> {
     printer::list_usb()
 }
+
+// ───────────────────────── Auth & Cashiers ─────────────────────────
+
+#[tauri::command]
+pub fn verify_pin(db: State<Db>, pin: String) -> R<Value> {
+    let c = db.0.lock().map_err(e)?;
+    let pin = pin.trim();
+    if pin.is_empty() {
+        return Err("Please enter a PIN".into());
+    }
+    // Check admin pin (default '0000')
+    let admin_pin: String = c
+        .query_row("SELECT value FROM settings WHERE key='admin_pin'", [], |r| r.get(0))
+        .unwrap_or_else(|_| "0000".to_string());
+    if pin == admin_pin {
+        return Ok(json!({
+            "id": 0,
+            "name": "Administrator",
+            "role": "admin",
+            "permissions": ["*"]
+        }));
+    }
+    // Check cashiers
+    let mut st = c.prepare("SELECT id, name, permissions FROM cashiers WHERE pin = ?1").map_err(e)?;
+    let mut rows = st.query_map([pin], |r| {
+        Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?, r.get::<_, String>(2)?))
+    }).map_err(e)?;
+
+    if let Some(Ok((id, name, perms_str))) = rows.next() {
+        let perms: Value = serde_json::from_str(&perms_str).unwrap_or(json!(["pos", "transactions"]));
+        return Ok(json!({
+            "id": id,
+            "name": name,
+            "role": "cashier",
+            "permissions": perms
+        }));
+    }
+
+    Err("Incorrect PIN. Please try again.".into())
+}
+
+#[tauri::command]
+pub fn change_admin_pin(db: State<Db>, old_pin: String, new_pin: String) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    let old_pin = old_pin.trim();
+    let new_pin = new_pin.trim();
+    if new_pin.len() < 4 {
+        return Err("New PIN must be at least 4 digits".into());
+    }
+    let current: String = c
+        .query_row("SELECT value FROM settings WHERE key='admin_pin'", [], |r| r.get(0))
+        .unwrap_or_else(|_| "0000".to_string());
+    if old_pin != current {
+        return Err("Current admin PIN is incorrect".into());
+    }
+    c.execute(
+        "INSERT INTO settings(key, value) VALUES('admin_pin', ?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+        [new_pin],
+    )
+    .map_err(e)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_cashiers(db: State<Db>) -> R<Vec<Value>> {
+    let c = db.0.lock().map_err(e)?;
+    let mut list = rows(&c, "SELECT id, name, pin, permissions, created_at FROM cashiers ORDER BY name COLLATE NOCASE", &[])?;
+    for item in list.iter_mut() {
+        if let Some(perms_str) = item.get("permissions").and_then(|p| p.as_str()) {
+            item["permissions_list"] = serde_json::from_str(perms_str).unwrap_or(json!([]));
+        }
+    }
+    Ok(list)
+}
+
+#[tauri::command]
+pub fn save_cashier(db: State<Db>, cashier: Value) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    let name = text(&cashier, "name");
+    let pin = text(&cashier, "pin");
+    if name.is_empty() {
+        return Err("Cashier name is required".into());
+    }
+    if pin.len() < 4 {
+        return Err("PIN must be at least 4 digits".into());
+    }
+    let admin_pin: String = c
+        .query_row("SELECT value FROM settings WHERE key='admin_pin'", [], |r| r.get(0))
+        .unwrap_or_else(|_| "0000".to_string());
+    if pin == admin_pin {
+        return Err("Cashier PIN cannot be the same as Admin PIN".into());
+    }
+
+    let perms = cashier.get("permissions").unwrap_or(&json!(["pos", "transactions"])).to_string();
+
+    match cashier.get("id").and_then(|x| x.as_i64()) {
+        Some(id) => {
+            let exists: i64 = c.query_row("SELECT COUNT(*) FROM cashiers WHERE pin=?1 AND id!=?2", params![&pin, id], |r| r.get(0)).unwrap_or(0);
+            if exists > 0 {
+                return Err("Another cashier is already using this PIN".into());
+            }
+            c.execute("UPDATE cashiers SET name=?, pin=?, permissions=? WHERE id=?", params![name, pin, perms, id]).map_err(e)?;
+        }
+        None => {
+            let exists: i64 = c.query_row("SELECT COUNT(*) FROM cashiers WHERE pin=?1", [&pin], |r| r.get(0)).unwrap_or(0);
+            if exists > 0 {
+                return Err("Another cashier is already using this PIN".into());
+            }
+            c.execute("INSERT INTO cashiers(name, pin, permissions, created_at) VALUES(?,?,?,?)", params![name, pin, perms, now()]).map_err(e)?;
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_cashier(db: State<Db>, id: i64) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    c.execute("DELETE FROM cashiers WHERE id=?", [id]).map_err(e)?;
+    Ok(())
+}
+

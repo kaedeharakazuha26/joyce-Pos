@@ -41,4 +41,9 @@ export const api = {
   printReceipt: (saleId) => call("print_receipt", { saleId }),
   printTest: () => call("print_test"),
   usbDevices: () => call("list_usb_devices"),
+  verifyPin: (pin) => call("verify_pin", { pin }),
+  changeAdminPin: (oldPin, newPin) => call("change_admin_pin", { oldPin, newPin }),
+  cashiers: () => call("list_cashiers"),
+  saveCashier: (cashier) => call("save_cashier", { cashier }),
+  deleteCashier: (id) => call("delete_cashier", { id }),
 };
