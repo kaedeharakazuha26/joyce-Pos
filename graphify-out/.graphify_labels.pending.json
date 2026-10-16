@@ -3,7 +3,7 @@
   "1": "package.json",
   "2": "printer.rs",
   "3": "tauri.conf.json",
-  "4": "ui.jsx",
+  "4": "ymd",
   "5": "App.jsx",
   "6": "useToast",
   "7": "db.rs",
@@ -17,7 +17,8 @@
   "15": "Value",
   "16": "Value",
   "17": "comm_args",
-  "19": "App.jsx",
+  "18": "errText",
+  "19": "Modal",
   "20": "R",
   "21": "Value"
 }
