@@ -717,6 +717,8 @@ pub fn admin_dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
         &c,
         r#"
         SELECT day,
+               day AS date,
+               ROUND(SUM(sales), 2) AS sales,
                ROUND(SUM(sales), 2) AS total,
                SUM(order_count) AS count,
                ROUND(SUM(expenses), 2) AS expenses,

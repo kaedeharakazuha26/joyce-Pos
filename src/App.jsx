@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { Component, createContext, useCallback, useContext, useEffect, useState } from "react";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -21,6 +21,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ShieldCheck,
+  ShieldAlert,
   Lock,
 } from "lucide-react";
 import { ToastProvider, Modal, Field } from "./components/ui";
@@ -70,6 +71,39 @@ const NAV = [
   { id: "employees", label: "Employees", icon: Users, page: Employees },
   { id: "settings", label: "Settings", icon: Cog, page: Settings },
 ];
+
+class PageErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error("Page render error caught by boundary:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="card" style={{ textAlign: "center", padding: 40, margin: "40px auto", maxWidth: 600 }}>
+          <ShieldAlert size={48} color="var(--bad)" style={{ margin: "0 auto 16px" }} />
+          <h3>Something went wrong rendering this section</h3>
+          <p className="muted" style={{ fontSize: 13, wordBreak: "break-word", margin: "12px 0 20px" }}>
+            {this.state.error?.message || "An unexpected error occurred."}
+          </p>
+          <button
+            className="btn sm"
+            onClick={() => this.setState({ hasError: false, error: null })}
+          >
+            Reload Section
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function App() {
   const [tab, setTab] = useState("pos");
@@ -490,7 +524,9 @@ export default function App() {
                   </div>
                 </div>
               ) : Page ? (
-                <Page />
+                <PageErrorBoundary key={`${tab}-${branchKey}`}>
+                  <Page />
+                </PageErrorBoundary>
               ) : (
                 <div className="empty">No access to this section.</div>
               )}

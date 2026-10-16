@@ -207,12 +207,11 @@ export default function AdminDashboard() {
   // Daily trend calculations
   const dailyMax = Math.max(
     1,
-    ...(d.daily || []).map((day) =>
-      Math.max(
-        Number(day.sales || 0),
-        Number(day.expenses || 0) + Number(day.salaries || 0) + Number(day.commissions || 0) + Number(day.ld_commissions || 0)
-      )
-    )
+    ...(d.daily || []).map((day) => {
+      const s = Number(day.sales ?? day.total ?? 0);
+      const ovh = Number(day.expenses || 0) + Number(day.salaries || 0) + Number(day.commissions || 0) + Number(day.ld_commissions || 0);
+      return Math.max(s, ovh);
+    })
   );
 
   // ── CSV Export with Native Folder / File Chooser ──
@@ -226,8 +225,8 @@ export default function AdminDashboard() {
       headers = ["Product ID", "Product Name", "Category", "Units Sold", "Total Revenue", "COGS", "Gross Profit", "Margin %", "Current Stock"];
       rows = filteredProducts.map((p) => [
         p.id,
-        `"${p.name.replace(/"/g, '""')}"`,
-        `"${p.category.replace(/"/g, '""')}"`,
+        `"${(p.name || "").replace(/"/g, '""')}"`,
+        `"${(p.category || "").replace(/"/g, '""')}"`,
         p.units_sold,
         p.revenue,
         p.cogs,
@@ -310,7 +309,7 @@ export default function AdminDashboard() {
       if (!d.expense_categories || d.expense_categories.length === 0) return toast("No expense data to export", "err");
       headers = ["Expense Category", "Transaction Count", "Total Amount"];
       rows = d.expense_categories.map((c) => [
-        `"${c.category.replace(/"/g, '""')}"`,
+        `"${(c.category || "General").replace(/"/g, '""')}"`,
         c.count,
         c.total,
       ]);
@@ -796,19 +795,27 @@ export default function AdminDashboard() {
           <Empty text="No daily transactions recorded in this date range" />
         ) : trendView === "chart" ? (
           <div className="bars" style={{ minHeight: 180, alignItems: "flex-end", gap: 10, overflowX: "auto", paddingBottom: 6 }}>
-            {d.daily.map((day) => {
-              const salesH = Math.max(6, (day.sales / dailyMax) * 100);
-              const totalOvh = day.expenses + day.salaries + day.commissions + day.ld_commissions;
+            {(d.daily || []).map((day, idx) => {
+              const dayDate = String(day.date || day.day || `Day ${idx + 1}`);
+              const salesVal = Number(day.sales ?? day.total ?? 0);
+              const expVal = Number(day.expenses || 0);
+              const salVal = Number(day.salaries || 0);
+              const comVal = Number(day.commissions || 0);
+              const ldVal = Number(day.ld_commissions || 0);
+              const totalOvh = expVal + salVal + comVal + ldVal;
+              const netVal = Number(day.net ?? (salesVal - totalOvh));
+
+              const salesH = Math.max(6, (salesVal / dailyMax) * 100);
               const ovhH = Math.max(6, (totalOvh / dailyMax) * 100);
 
-              const expPct = totalOvh > 0 ? (day.expenses / totalOvh) * 100 : 0;
-              const salPct = totalOvh > 0 ? (day.salaries / totalOvh) * 100 : 0;
-              const comPct = totalOvh > 0 ? (day.commissions / totalOvh) * 100 : 0;
-              const ldPct = totalOvh > 0 ? (day.ld_commissions / totalOvh) * 100 : 0;
+              const expPct = totalOvh > 0 ? (expVal / totalOvh) * 100 : 0;
+              const salPct = totalOvh > 0 ? (salVal / totalOvh) * 100 : 0;
+              const comPct = totalOvh > 0 ? (comVal / totalOvh) * 100 : 0;
+              const ldPct = totalOvh > 0 ? (ldVal / totalOvh) * 100 : 0;
 
               return (
                 <div
-                  key={day.date}
+                  key={dayDate || idx}
                   style={{
                     flex: 1,
                     minWidth: 50,
@@ -827,7 +834,7 @@ export default function AdminDashboard() {
                       height: 140,
                       justifyContent: "center",
                     }}
-                    title={`${day.date}\nSales: ${peso(day.sales)}\nStore Expenses: ${peso(day.expenses)}\nSalaries: ${peso(day.salaries)}\nCommissions: ${peso(day.commissions)}\nLD Comm: ${peso(day.ld_commissions)}\nNet Operating: ${peso(day.net)}`}
+                    title={`${dayDate}\nSales: ${peso(salesVal)}\nStore Expenses: ${peso(expVal)}\nSalaries: ${peso(salVal)}\nCommissions: ${peso(comVal)}\nLD Comm: ${peso(ldVal)}\nNet Operating: ${peso(netVal)}`}
                   >
                     {/* Sales Column */}
                     <div
@@ -853,14 +860,14 @@ export default function AdminDashboard() {
                         transition: "height 0.3s ease",
                       }}
                     >
-                      {day.expenses > 0 && <div style={{ height: `${expPct}%`, background: "#ef4444" }} />}
-                      {day.salaries > 0 && <div style={{ height: `${salPct}%`, background: "#8b5cf6" }} />}
-                      {day.commissions > 0 && <div style={{ height: `${comPct}%`, background: "#38bdf8" }} />}
-                      {day.ld_commissions > 0 && <div style={{ height: `${ldPct}%`, background: "#2fcf8a" }} />}
+                      {expVal > 0 && <div style={{ height: `${expPct}%`, background: "#ef4444" }} />}
+                      {salVal > 0 && <div style={{ height: `${salPct}%`, background: "#8b5cf6" }} />}
+                      {comVal > 0 && <div style={{ height: `${comPct}%`, background: "#38bdf8" }} />}
+                      {ldVal > 0 && <div style={{ height: `${ldPct}%`, background: "#2fcf8a" }} />}
                     </div>
                   </div>
                   <span style={{ fontSize: 10, color: "var(--muted)", whiteSpace: "nowrap" }}>
-                    {day.date.slice(5)}
+                    {dayDate.length >= 5 ? dayDate.slice(5) : dayDate}
                   </span>
                 </div>
               );
@@ -882,21 +889,28 @@ export default function AdminDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {d.daily.map((day) => {
-                  const ovh = day.expenses + day.salaries + day.commissions + day.ld_commissions;
-                  const isPositive = day.net >= 0;
+                {(d.daily || []).map((day, idx) => {
+                  const dayDate = String(day.date || day.day || `Day ${idx + 1}`);
+                  const salesVal = Number(day.sales ?? day.total ?? 0);
+                  const expVal = Number(day.expenses || 0);
+                  const salVal = Number(day.salaries || 0);
+                  const comVal = Number(day.commissions || 0);
+                  const ldVal = Number(day.ld_commissions || 0);
+                  const ovh = expVal + salVal + comVal + ldVal;
+                  const netVal = Number(day.net ?? (salesVal - ovh));
+                  const isPositive = netVal >= 0;
                   return (
-                    <tr key={day.date} className="row-hover">
-                      <td><b>{day.date}</b></td>
-                      <td className="num" style={{ fontWeight: 600, color: "#ff7a3d" }}>{peso(day.sales)}</td>
-                      <td className="num" style={{ color: "#ef4444" }}>{peso(day.expenses)}</td>
-                      <td className="num" style={{ color: "#8b5cf6" }}>{peso(day.salaries)}</td>
-                      <td className="num" style={{ color: "#38bdf8" }}>{peso(day.commissions)}</td>
-                      <td className="num" style={{ color: "#2fcf8a" }}>{peso(day.ld_commissions)}</td>
+                    <tr key={dayDate || idx} className="row-hover">
+                      <td><b>{dayDate}</b></td>
+                      <td className="num" style={{ fontWeight: 600, color: "#ff7a3d" }}>{peso(salesVal)}</td>
+                      <td className="num" style={{ color: "#ef4444" }}>{peso(expVal)}</td>
+                      <td className="num" style={{ color: "#8b5cf6" }}>{peso(salVal)}</td>
+                      <td className="num" style={{ color: "#38bdf8" }}>{peso(comVal)}</td>
+                      <td className="num" style={{ color: "#2fcf8a" }}>{peso(ldVal)}</td>
                       <td className="num" style={{ fontWeight: 600 }}>{peso(ovh)}</td>
                       <td className="num">
                         <span className={"badge " + (isPositive ? "ok" : "bad")}>
-                          {isPositive ? `+${peso(day.net)}` : peso(day.net)}
+                          {isPositive ? `+${peso(netVal)}` : peso(netVal)}
                         </span>
                       </td>
                     </tr>
