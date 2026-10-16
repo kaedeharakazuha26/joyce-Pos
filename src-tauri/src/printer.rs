@@ -158,12 +158,105 @@ pub fn list_usb() -> R<Vec<Value>> {
     let mut out = vec![];
     for d in rusb::devices().map_err(e)?.iter() {
         let Ok(desc) = d.device_descriptor() else { continue };
-        let name = d
+        let vid = desc.vendor_id();
+        let pid = desc.product_id();
+        let class = desc.class_code();
+
+        // 1. Exclude virtual Linux root hubs (VID 0x1d6b)
+        if vid == 0x1d6b {
+            continue;
+        }
+
+        // 2. Exclude USB Hubs (Class 0x09)
+        if class == 9 {
+            continue;
+        }
+
+        // 3. Inspect configuration / interfaces to check for PRINTER interface (Class 7)
+        // or bulk out endpoint (standard for ESC/POS thermal printers)
+        let mut is_printer_class = class == 7;
+        let mut has_bulk_out = false;
+        let mut is_blacklisted_class = matches!(class, 1 /* Audio */ | 3 /* HID */ | 14 /* Video */ | 224 /* Wireless */);
+
+        if let Ok(cfg) = d.active_config_descriptor() {
+            for ifc in cfg.interfaces() {
+                for ifc_desc in ifc.descriptors() {
+                    let ifc_class = ifc_desc.class_code();
+                    if ifc_class == 7 {
+                        is_printer_class = true;
+                    }
+                    if matches!(ifc_class, 1 | 3 | 14 | 224) {
+                        is_blacklisted_class = true;
+                    }
+                    for ep in ifc_desc.endpoint_descriptors() {
+                        if ep.direction() == rusb::Direction::Out && ep.transfer_type() == rusb::TransferType::Bulk {
+                            has_bulk_out = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        let (mfg, prod) = d
             .open()
             .ok()
-            .and_then(|h| h.read_product_string_ascii(&desc).ok())
-            .unwrap_or_else(|| "USB device".into());
-        out.push(json!({ "vid": format!("{:04x}", desc.vendor_id()), "pid": format!("{:04x}", desc.product_id()), "name": name }));
+            .map(|h| {
+                let m = h.read_manufacturer_string_ascii(&desc).ok();
+                let p = h.read_product_string_ascii(&desc).ok();
+                (m, p)
+            })
+            .unwrap_or((None, None));
+
+        let name = match (&mfg, &prod) {
+            (Some(m), Some(p)) if !m.is_empty() && !p.is_empty() => format!("{} {}", m.trim(), p.trim()),
+            (_, Some(p)) if !p.is_empty() => p.trim().to_string(),
+            (Some(m), _) if !m.is_empty() => m.trim().to_string(),
+            _ => format!("USB Device {:04x}:{:04x}", vid, pid),
+        };
+
+        let lower = name.to_lowercase();
+
+        // Common thermal printer keywords
+        let name_is_printer = lower.contains("printer")
+            || lower.contains("pos")
+            || lower.contains("thermal")
+            || lower.contains("receipt")
+            || lower.contains("esc")
+            || lower.contains("xprinter")
+            || lower.contains("rongta")
+            || lower.contains("epson")
+            || lower.contains("citizen")
+            || lower.contains("star")
+            || lower.contains("bixolon")
+            || lower.contains("zywell")
+            || lower.contains("gprinter")
+            || lower.contains("58")
+            || lower.contains("80");
+
+        // Discard devices that are definitely not printers
+        let is_excluded_name = lower.contains("camera")
+            || lower.contains("audio")
+            || lower.contains("bluetooth")
+            || lower.contains("touch")
+            || lower.contains("fingerprint")
+            || lower.contains("keyboard")
+            || lower.contains("mouse")
+            || lower.contains("receiver")
+            || lower.contains("hub");
+
+        if is_excluded_name {
+            continue;
+        }
+
+        // Include only if confirmed printer class, printer keyword in name, or valid non-blacklisted bulk OUT device
+        if is_printer_class || name_is_printer || (has_bulk_out && !is_blacklisted_class) {
+            out.push(json!({
+                "vid": format!("{:04x}", vid),
+                "pid": format!("{:04x}", pid),
+                "name": name,
+                "is_printer": is_printer_class || name_is_printer,
+            }));
+        }
     }
     Ok(out)
 }
