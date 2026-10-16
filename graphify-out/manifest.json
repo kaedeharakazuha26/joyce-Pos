@@ -30,21 +30,21 @@
     "semantic_hash": ""
   },
   "src-tauri/src/cmds.rs": {
-    "mtime": 1792166144.9180548,
-    "seen": 1792166721.7747934,
-    "ast_hash": "c871efb6e67288a4c0ff0efedc9e3422",
+    "mtime": 1792169959.2930815,
+    "seen": 1792170310.4581409,
+    "ast_hash": "29601ce2a77bb715422b4ece71a9acd3",
     "semantic_hash": ""
   },
   "src-tauri/src/db.rs": {
-    "mtime": 1792165933.2796094,
-    "seen": 1792166721.774795,
-    "ast_hash": "12dc199f3328029fd2157e8d79549f22",
+    "mtime": 1792170173.4126136,
+    "seen": 1792170310.4581456,
+    "ast_hash": "24ecc366ec0f55e6e7a9540f575869d4",
     "semantic_hash": ""
   },
   "src-tauri/src/lib.rs": {
-    "mtime": 1792165998.689593,
-    "seen": 1792166721.774796,
-    "ast_hash": "0ed3b05ea064c974604cf27465a89993",
+    "mtime": 1792169961.4250968,
+    "seen": 1792170310.4581492,
+    "ast_hash": "57fe176d26c9d1b980a1fe081d6f2ff3",
     "semantic_hash": ""
   },
   "src-tauri/src/main.rs": {
@@ -66,15 +66,15 @@
     "semantic_hash": ""
   },
   "src/App.jsx": {
-    "mtime": 1792166446.861117,
-    "seen": 1792166721.7748015,
-    "ast_hash": "39f45f828f402874510529a359260607",
+    "mtime": 1792169970.419161,
+    "seen": 1792170310.4581666,
+    "ast_hash": "a21c722ba61f2c84cdd9945d97cbe942",
     "semantic_hash": ""
   },
   "src/api.js": {
-    "mtime": 1792166316.5161254,
-    "seen": 1792166721.7748027,
-    "ast_hash": "3752d5a220a3d24c995995c93df2539c",
+    "mtime": 1792169963.560112,
+    "seen": 1792170310.4581702,
+    "ast_hash": "2e4dbcb05798b0dda50a09caf95ea182",
     "semantic_hash": ""
   },
   "src/components/ui.jsx": {
@@ -114,8 +114,8 @@
     "semantic_hash": ""
   },
   "src/pages/Products.jsx": {
-    "mtime": 1792166490.502415,
-    "seen": 1792166721.774811,
+    "mtime": 1792169370.0609186,
+    "seen": 1792170310.4581985,
     "ast_hash": "de171d98328191ce7ce1cfc022573476",
     "semantic_hash": ""
   },
@@ -267,6 +267,12 @@
     "mtime": 1792166733.0860715,
     "seen": 1792167184.5611546,
     "ast_hash": "63d4f7abcce76a5e5831f03f57c532f5",
+    "semantic_hash": ""
+  },
+  "src/pages/Employees.jsx": {
+    "mtime": 1792170171.3025985,
+    "seen": 1792170310.4581916,
+    "ast_hash": "6179270ed5585178563aba05a15936ad",
     "semantic_hash": ""
   }
 }
