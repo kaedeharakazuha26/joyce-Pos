@@ -6,14 +6,11 @@
   "4": "ui.jsx",
   "5": "App.jsx",
   "7": "db.rs",
-  "8": "Db",
+  "8": "cmds.rs",
   "9": "default.json",
   "10": "set-version.mjs",
   "11": "build.rs",
   "12": "main.rs",
   "13": "joyce-pos",
-  "16": "Value",
-  "17": "comm_args",
-  "18": "cmds.rs",
   "20": "JOYCE POS"
 }
