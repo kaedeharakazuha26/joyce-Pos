@@ -81,5 +81,27 @@ export const pctChange = (current, previous) => {
   };
 };
 
-export const errText = (e) => (typeof e === "string" ? e : e?.message || "Something went wrong");
+export const DATE_PRESETS = [
+  { id: "today", label: "Today", range: (bizDate) => [bizDate || ymd(), bizDate || ymd()] },
+  { id: "yesterday", label: "Yesterday", range: () => [yesterday(), yesterday()] },
+  { id: "this_week", label: "This Week", range: () => [weekStart(), ymd()] },
+  { id: "last_week", label: "Last Week", range: () => lastWeekRange() },
+  { id: "this_month", label: "This Month", range: () => [monthStart(), ymd()] },
+  { id: "last_month", label: "Last Month", range: () => lastMonthRange() },
+  { id: "this_quarter", label: "This Quarter", range: () => [quarterStart(), ymd()] },
+  { id: "this_year", label: "This Year", range: () => [yearStart(), ymd()] },
+];
 
+export const downloadBlob = (filename, content, mime = "text/csv;charset=utf-8") => {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+export const errText = (e) => (typeof e === "string" ? e : e?.message || "Something went wrong");

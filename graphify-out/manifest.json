@@ -138,9 +138,9 @@
     "semantic_hash": ""
   },
   "src/utils.js": {
-    "mtime": 1792230320.6744485,
-    "seen": 1792231368.4782581,
-    "ast_hash": "afa80dd2f5a6ff1b7d025b5eaaff7d7c",
+    "mtime": 1792233360.4896238,
+    "seen": 1792233715.1261406,
+    "ast_hash": "c3dfc401d95247b854a7080dbbdcf133",
     "semantic_hash": ""
   },
   "vite.config.js": {
@@ -288,9 +288,63 @@
     "semantic_hash": ""
   },
   "src/pages/AdminDashboard.jsx": {
-    "mtime": 1792231461.240432,
-    "seen": 1792231558.0236406,
-    "ast_hash": "9b09c98b7e95f95ee06c8a3652e267be",
+    "mtime": 1792233684.3271303,
+    "seen": 1792233715.1261075,
+    "ast_hash": "fe181f47034a0244f78587b74876a1a6",
+    "semantic_hash": ""
+  },
+  "src/components/admin/AdminCharts.jsx": {
+    "mtime": 1792232981.2586884,
+    "seen": 1792233715.1260664,
+    "ast_hash": "77247d5294fd109d98d34bcd7d4b2763",
+    "semantic_hash": ""
+  },
+  "src/components/admin/AdminKpiGrid.jsx": {
+    "mtime": 1792232817.2704191,
+    "seen": 1792233715.1260705,
+    "ast_hash": "e9ba6744848c5ba2fb3d9029d120e57d",
+    "semantic_hash": ""
+  },
+  "src/components/admin/AdminModals.jsx": {
+    "mtime": 1792232982.7867002,
+    "seen": 1792233715.126074,
+    "ast_hash": "bbdeecbeb8ac12f0cb1f11ca1b1540f6",
+    "semantic_hash": ""
+  },
+  "src/components/admin/AdminOverviewPnL.jsx": {
+    "mtime": 1792233066.9453518,
+    "seen": 1792233715.1260777,
+    "ast_hash": "c8053511df7d35a00bfd73fe3d234382",
+    "semantic_hash": ""
+  },
+  "src/components/admin/AdminPayrollAuditTables.jsx": {
+    "mtime": 1792233492.8746486,
+    "seen": 1792233715.126081,
+    "ast_hash": "d8e9bda7355ddf11daa4173846a7e3e5",
+    "semantic_hash": ""
+  },
+  "src/components/admin/AdminReportsModule.jsx": {
+    "mtime": 1792233536.0969832,
+    "seen": 1792233715.1260846,
+    "ast_hash": "d32834d6c4814d66f901527946b36800",
+    "semantic_hash": ""
+  },
+  "src/components/admin/AdminSalesInventoryTables.jsx": {
+    "mtime": 1792233434.1131938,
+    "seen": 1792233715.126088,
+    "ast_hash": "779ed11d043f9f5f6a398b802f31d353",
+    "semantic_hash": ""
+  },
+  "src/components/admin/adminUtils.js": {
+    "mtime": 1792232815.2744038,
+    "seen": 1792233715.1260912,
+    "ast_hash": "972748a5edd5cea3d06f51b83d9324ae",
+    "semantic_hash": ""
+  },
+  "src/components/admin/useAdminController.js": {
+    "mtime": 1792233608.1045403,
+    "seen": 1792233715.1260946,
+    "ast_hash": "071569f97e2eec17ae0dde155af2a487",
     "semantic_hash": ""
   }
 }

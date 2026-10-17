@@ -3,9 +3,8 @@
   "1": "package.json",
   "2": "printer.rs",
   "3": "tauri.conf.json",
-  "4": "ymd",
+  "4": "ui.jsx",
   "5": "App.jsx",
-  "6": "AdminDashboard.jsx",
   "7": "db.rs",
   "8": "Db",
   "9": "default.json",
@@ -13,12 +12,8 @@
   "11": "build.rs",
   "12": "main.rs",
   "13": "joyce-pos",
-  "14": "R",
-  "15": "peso",
   "16": "Value",
   "17": "comm_args",
   "18": "cmds.rs",
-  "19": "Modal",
-  "20": "JOYCE POS",
-  "21": "Value"
+  "20": "JOYCE POS"
 }
