@@ -282,10 +282,27 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             notes TEXT NOT NULL DEFAULT ''
         );
 
+        CREATE TABLE IF NOT EXISTS audit_logs(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            actor TEXT NOT NULL DEFAULT 'Administrator',
+            role TEXT NOT NULL DEFAULT 'admin',
+            action TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL DEFAULT '',
+            summary TEXT NOT NULL,
+            details_json TEXT NOT NULL DEFAULT '{}'
+        );
+
         CREATE INDEX IF NOT EXISTS idx_sales_created ON sales(created_at);
         CREATE INDEX IF NOT EXISTS idx_items_sale ON sale_items(sale_id);
         CREATE INDEX IF NOT EXISTS idx_variants_product ON variants(product_id);
         CREATE INDEX IF NOT EXISTS idx_shifts_status ON shifts(status);
+        CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_logs(timestamp);
+        CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
+        CREATE INDEX IF NOT EXISTS idx_salaries_date ON salaries(date);
+        CREATE INDEX IF NOT EXISTS idx_commissions_date ON commissions(date);
+        CREATE INDEX IF NOT EXISTS idx_ld_commissions_date ON ld_commissions(date);
         "#,
     )?;
 

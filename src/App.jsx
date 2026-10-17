@@ -1,4 +1,4 @@
-import { Component, createContext, useCallback, useContext, useEffect, useState } from "react";
+import { Component, createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -17,12 +17,25 @@ import {
   Sunrise,
   Sunset,
   Printer,
-  Calendar,
   AlertCircle,
   CheckCircle2,
   ShieldCheck,
   ShieldAlert,
   Lock,
+  Search,
+  Bell,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Menu,
+  X,
+  Sun,
+  Moon,
+  ChevronRight,
+  Zap,
+  CheckCheck,
+  ExternalLink,
+  AlertTriangle,
+  Info,
 } from "lucide-react";
 import { ToastProvider, Modal, Field } from "./components/ui";
 import { api } from "./api";
@@ -38,7 +51,7 @@ import Salary from "./pages/Salary";
 import { Commission, LDCommission } from "./pages/Commissions";
 import Employees from "./pages/Employees";
 import Settings from "./pages/Settings";
-import { peso, ymd } from "./utils";
+import { monthStart, peso, ymd } from "./utils";
 
 const SettingsCtx = createContext({
   settings: {},
@@ -52,24 +65,29 @@ const SettingsCtx = createContext({
   activeBusinessDate: ymd(),
   openSod: () => {},
   openEod: () => {},
+  navigateTo: () => {},
+  navigateToAdminReport: () => {},
+  adminReportIntent: null,
+  clearAdminReportIntent: () => {},
+  refreshAlerts: async () => {},
 });
 export const useSettings = () => useContext(SettingsCtx);
 
 const GATED_SHIFT_TABS = ["pos", "expenses", "commission", "ld-commission", "salary"];
 
 const NAV = [
-  { id: "admin-dashboard", label: "Admin Dashboard", icon: ShieldCheck, page: AdminDashboard, adminOnly: true },
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, page: Dashboard },
-  { id: "pos", label: "POS", icon: ShoppingCart, page: POS },
-  { id: "transactions", label: "Transactions", icon: History, page: Transactions },
-  { id: "products", label: "Products", icon: Package, page: Products },
-  { id: "inventory", label: "Inventory", icon: Boxes, page: Inventory },
-  { id: "expenses", label: "Expenses", icon: ReceiptIcon, page: Expenses },
-  { id: "salary", label: "Salary", icon: Wallet, page: Salary },
-  { id: "commission", label: "Commission", icon: Coins, page: Commission },
-  { id: "ld-commission", label: "LD Commission", icon: Smartphone, page: LDCommission },
-  { id: "employees", label: "Employees", icon: Users, page: Employees },
-  { id: "settings", label: "Settings", icon: Cog, page: Settings },
+  { id: "admin-dashboard", label: "Admin Dashboard", group: "Analytics & Control", icon: ShieldCheck, page: AdminDashboard, adminOnly: true },
+  { id: "dashboard", label: "Store Overview", group: "Analytics & Control", icon: LayoutDashboard, page: Dashboard },
+  { id: "pos", label: "Point of Sale (POS)", group: "Operations", icon: ShoppingCart, page: POS },
+  { id: "transactions", label: "Transactions", group: "Operations", icon: History, page: Transactions },
+  { id: "products", label: "Products Catalog", group: "Inventory & Catalog", icon: Package, page: Products },
+  { id: "inventory", label: "Stock & Restock", group: "Inventory & Catalog", icon: Boxes, page: Inventory },
+  { id: "expenses", label: "Store Expenses", group: "Finance & Payroll", icon: ReceiptIcon, page: Expenses },
+  { id: "salary", label: "Salary Payroll", group: "Finance & Payroll", icon: Wallet, page: Salary },
+  { id: "commission", label: "Commissions", group: "Finance & Payroll", icon: Coins, page: Commission },
+  { id: "ld-commission", label: "LD Commissions", group: "Finance & Payroll", icon: Smartphone, page: LDCommission },
+  { id: "employees", label: "Employees", group: "Administration", icon: Users, page: Employees },
+  { id: "settings", label: "Settings", group: "Administration", icon: Cog, page: Settings },
 ];
 
 class PageErrorBoundary extends Component {
@@ -117,6 +135,43 @@ export default function App() {
     }
   });
 
+  // Responsive & Collapsible Sidebar state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("joyce-sidebar-collapsed") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  // Deep-link navigation state into AdminDashboard reports
+  const [adminReportIntent, setAdminReportIntent] = useState(null);
+
+  // Global Search state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchRef = useRef(null);
+
+  // Notifications & Important Alerts state
+  const [alerts, setAlerts] = useState([]);
+  const [dismissedAlertIds, setDismissedAlertIds] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem("joyce-dismissed-alerts");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [quickMenuOpen, setQuickMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const notifRef = useRef(null);
+  const quickRef = useRef(null);
+  const userRef = useRef(null);
+
   const [branchInfo, setBranchInfo] = useState(null);
   const [branchKey, setBranchKey] = useState(0);
   const [showAddBranch, setShowAddBranch] = useState(false);
@@ -138,9 +193,27 @@ export default function App() {
   });
   const [submittingShift, setSubmittingShift] = useState(false);
 
+  const toggleSidebarCollapse = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("joyce-sidebar-collapsed", next ? "1" : "0");
+      } catch {}
+      return next;
+    });
+  };
+
   const applyTheme = (t) => {
     document.documentElement.dataset.theme = t;
     localStorage.setItem("joyce-theme", t);
+  };
+
+  const toggleTheme = () => {
+    const cur = document.documentElement.dataset.theme || "dark";
+    const next = cur === "dark" ? "light" : "dark";
+    applyTheme(next);
+    setSettings((s) => ({ ...s, theme: next }));
+    api.setSettings({ theme: next }).catch(() => {});
   };
 
   useEffect(() => {
@@ -172,10 +245,71 @@ export default function App() {
     }
   }, []);
 
+  const refreshAlerts = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const d = await api.adminDashboard(monthStart(), ymd());
+      if (Array.isArray(d?.alerts)) {
+        setAlerts(d.alerts);
+      }
+    } catch {
+      // Fallback for non-admin or initial load
+    }
+  }, [currentUser]);
+
   useEffect(() => {
     loadBranchInfo();
     loadShiftStatus();
-  }, [loadBranchInfo, loadShiftStatus, branchKey]);
+    refreshAlerts();
+  }, [loadBranchInfo, loadShiftStatus, refreshAlerts, branchKey]);
+
+  // Close topbar popovers on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+      if (quickRef.current && !quickRef.current.contains(e.target)) setQuickMenuOpen(false);
+      if (userRef.current && !userRef.current.contains(e.target)) setUserMenuOpen(false);
+    };
+    window.addEventListener("mousedown", handleClickOutside);
+    return () => window.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Keyboard shortcut Ctrl+K / Cmd+K for Global Search
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+        const el = document.getElementById("global-search-input");
+        if (el) el.focus();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Debounced Global Search
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults(null);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.globalSearch(q);
+        setSearchResults(res);
+      } catch (e) {
+        console.error("Global search failed:", e);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const save = useCallback(async (values) => {
     await api.setSettings(values);
@@ -186,12 +320,61 @@ export default function App() {
   const handleUnlock = (user) => {
     sessionStorage.setItem("joyce-user", JSON.stringify(user));
     setCurrentUser(user);
+    if (user.role === "admin") {
+      setTab("admin-dashboard");
+    }
   };
 
   const handleLogout = () => {
     sessionStorage.removeItem("joyce-user");
     setCurrentUser(null);
+    setUserMenuOpen(false);
   };
+
+  const navigateTo = useCallback(
+    (targetTab) => {
+      const isGated = GATED_SHIFT_TABS.includes(targetTab) && !shiftStatus?.is_open;
+      setMobileNavOpen(false);
+      if (isGated) {
+        setSodForm({ businessDate: ymd(), openingCash: "0", notes: "" });
+        setShowSodModal(true);
+      } else {
+        setTab(targetTab);
+      }
+    },
+    [shiftStatus]
+  );
+
+  const navigateToAdminReport = useCallback(
+    (reportTab, filters = {}) => {
+      setMobileNavOpen(false);
+      setAdminReportIntent({
+        reportTab,
+        ...filters,
+        ts: Date.now(),
+      });
+      if (currentUser?.role === "admin") {
+        setTab("admin-dashboard");
+      } else {
+        // Fallback for non-admin users to corresponding operational module
+        const map = {
+          sales: "transactions",
+          products: "products",
+          expenses: "expenses",
+          salaries: "salary",
+          commissions: "commission",
+          "ld-commissions": "ld-commission",
+          employees: "employees",
+        };
+        setTab(map[reportTab] || "dashboard");
+      }
+    },
+    [currentUser]
+  );
+
+  const clearAdminReportIntent = useCallback(() => {
+    setAdminReportIntent(null);
+  }, []);
 
   const handleSwitchBranch = async (branchId) => {
     try {
@@ -202,6 +385,7 @@ export default function App() {
       if (s.theme) applyTheme(s.theme);
       setBranchKey((k) => k + 1);
       await loadShiftStatus();
+      await refreshAlerts();
     } catch (e) {
       alert("Failed to switch branch: " + e);
     }
@@ -220,6 +404,7 @@ export default function App() {
       setShowAddBranch(false);
       setNewBranchName("");
       await loadShiftStatus();
+      await refreshAlerts();
     } catch (e) {
       alert("Failed to create branch: " + e);
     } finally {
@@ -238,6 +423,7 @@ export default function App() {
         sodForm.notes
       );
       await loadShiftStatus();
+      await refreshAlerts();
       setShowSodModal(false);
       setSodForm({ businessDate: ymd(), openingCash: "0", notes: "" });
     } catch (err) {
@@ -261,6 +447,7 @@ export default function App() {
         eodForm.notes
       );
       await loadShiftStatus();
+      await refreshAlerts();
       setShowEodModal(false);
       setEodForm({ closingCash: "", notes: "" });
       alert(
@@ -271,6 +458,23 @@ export default function App() {
     } finally {
       setSubmittingShift(false);
     }
+  };
+
+  const dismissAlert = (id) => {
+    setDismissedAlertIds((prev) => {
+      const next = [...new Set([...prev, id])];
+      try {
+        sessionStorage.setItem("joyce-dismissed-alerts", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const clearDismissedAlerts = () => {
+    setDismissedAlertIds([]);
+    try {
+      sessionStorage.removeItem("joyce-dismissed-alerts");
+    } catch {}
   };
 
   const activeBusinessDate = shiftStatus?.is_open
@@ -289,10 +493,7 @@ export default function App() {
 
   const allowedNav = NAV.filter((item) => {
     if (!currentUser) return false;
-    // Admin dashboard and admin-only tabs are strictly restricted to role === "admin"
     if (item.adminOnly && currentUser.role !== "admin") return false;
-
-    // Per-branch disabled menus (core system tabs are protected)
     if (!["admin-dashboard", "dashboard", "pos", "transactions", "products", "settings"].includes(item.id)) {
       if (disabledMenus.includes(item.id)) return false;
     }
@@ -313,6 +514,58 @@ export default function App() {
 
   const currentItem = allowedNav.find((n) => n.id === tab) || allowedNav[0];
   const Page = currentItem ? currentItem.page : null;
+  const activeBranchName =
+    branchInfo?.branches?.find((b) => b.id === branchInfo.active_branch)?.name || "Main Store";
+
+  const visibleAlerts = alerts.filter((a) => !dismissedAlertIds.includes(a.id));
+
+  const handleAlertClick = (a) => {
+    setNotifOpen(false);
+    if (a.target === "shift") {
+      if (!shiftStatus?.is_open) {
+        setSodForm({ businessDate: ymd(), openingCash: "0", notes: "" });
+        setShowSodModal(true);
+      } else {
+        navigateToAdminReport("shifts", { filter: a.filter || "all" });
+      }
+      return;
+    }
+    navigateToAdminReport(a.target || "overview", { statusFilter: a.filter || "all" });
+  };
+
+  const handleSearchResultClick = (type, item) => {
+    setSearchOpen(false);
+    setSearchQuery("");
+    if (currentUser?.role === "admin") {
+      const map = {
+        products: { reportTab: "products", search: item.name },
+        sales: { reportTab: "sales", search: item.receipt_no },
+        expenses: { reportTab: "expenses", search: item.category },
+        salaries: { reportTab: "salaries", search: item.staff_name },
+        commissions: { reportTab: "commissions", search: item.staff_name },
+        ld_commissions: { reportTab: "ld-commissions", search: item.staff_name },
+        employees: { reportTab: "employees", search: item.name },
+        shifts: { reportTab: "shifts", search: item.business_date },
+      };
+      const target = map[type] || { reportTab: "overview" };
+      navigateToAdminReport(target.reportTab, { search: target.search || "" });
+    } else {
+      const tabMap = {
+        products: "products",
+        sales: "transactions",
+        expenses: "expenses",
+        salaries: "salary",
+        commissions: "commission",
+        ld_commissions: "ld-commission",
+        employees: "employees",
+      };
+      navigateTo(tabMap[type] || "dashboard");
+    }
+  };
+
+  const totalSearchHits = searchResults
+    ? Object.values(searchResults).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0)
+    : 0;
 
   return (
     <ToastProvider>
@@ -336,143 +589,197 @@ export default function App() {
             setEodForm({ closingCash: "", notes: "" });
             setShowEodModal(true);
           },
+          navigateTo,
+          navigateToAdminReport,
+          adminReportIntent,
+          clearAdminReportIntent,
+          refreshAlerts,
         }}
       >
         {!currentUser ? (
           <PinLock onUnlock={handleUnlock} />
         ) : (
-          <div className="app">
-            <aside className="sidebar">
+          <div className={`app ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
+            {/* Mobile backdrop when sidebar drawer is open */}
+            {mobileNavOpen && (
+              <div
+                className="mobile-nav-backdrop"
+                onClick={() => setMobileNavOpen(false)}
+                aria-hidden="true"
+              />
+            )}
+
+            <aside className={`sidebar ${sidebarCollapsed ? "collapsed" : ""} ${mobileNavOpen ? "mobile-open" : ""}`}>
               <div className="brand">
                 <img src="/logo.png" alt="JOYCE POS logo" />
-                <div>
-                  <b>JOYCE POS</b>
-                  <small></small>
-                </div>
-              </div>
-
-              {/* Branch switcher dropdown with plus icon below JOYCE POS */}
-              <div className="branch-bar">
-                <div className="branch-selector">
-                  <Store size={15} className="branch-icon" />
-                  <select
-                    id="branch-select"
-                    value={branchInfo?.active_branch || "main"}
-                    onChange={(e) => handleSwitchBranch(e.target.value)}
-                    title="Switch active store branch"
-                  >
-                    {(branchInfo?.branches || [{ id: "main", name: "Main Store" }]).map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                {!sidebarCollapsed && (
+                  <div className="brand-text">
+                    <b>{settings.store_name || "JOYCE POS"}</b>
+                    <small>{activeBranchName}</small>
+                  </div>
+                )}
                 <button
                   type="button"
-                  className="btn-icon branch-add-btn"
-                  title="Create new branch"
-                  onClick={() => setShowAddBranch(true)}
+                  className="icon-btn sidebar-collapse-btn"
+                  onClick={toggleSidebarCollapse}
+                  title={sidebarCollapsed ? "Expand navigation sidebar" : "Collapse navigation sidebar"}
+                  aria-label="Toggle sidebar"
                 >
-                  <Plus size={15} />
+                  {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
                 </button>
               </div>
 
-              {/* Start of Day / End of Day Shift Widget */}
-              <div className={`shift-widget ${shiftStatus?.is_open ? "open" : "closed"}`}>
-                <div className="shift-widget-header">
-                  <div className="shift-badge">
-                    <span className="shift-dot" />
-                    <span>{shiftStatus?.is_open ? "DAY OPEN" : "DAY CLOSED"}</span>
+              {/* Branch switcher dropdown */}
+              {!sidebarCollapsed && (
+                <div className="branch-bar">
+                  <div className="branch-selector">
+                    <Store size={15} className="branch-icon" />
+                    <select
+                      id="branch-select"
+                      value={branchInfo?.active_branch || "main"}
+                      onChange={(e) => handleSwitchBranch(e.target.value)}
+                      title="Switch active store branch"
+                    >
+                      {(branchInfo?.branches || [{ id: "main", name: "Main Store" }]).map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                  <span className="shift-date">
-                    {shiftStatus?.is_open ? shiftStatus.shift.business_date : "No active shift"}
-                  </span>
+                  <button
+                    type="button"
+                    className="btn-icon branch-add-btn"
+                    title="Create new branch"
+                    onClick={() => setShowAddBranch(true)}
+                  >
+                    <Plus size={15} />
+                  </button>
                 </div>
+              )}
 
-                {shiftStatus?.is_open ? (
-                  <div className="shift-widget-body">
-                    <div className="shift-details">
-                      <span>Started: <b>{shiftStatus.shift.opened_at?.slice(11, 16) || "—"}</b></span>
-                      <span>Cash in drawer: <b>{peso(shiftStatus.shift.expected_cash)}</b></span>
+              {/* Start of Day / End of Day Shift Widget */}
+              {!sidebarCollapsed ? (
+                <div className={`shift-widget ${shiftStatus?.is_open ? "open" : "closed"}`}>
+                  <div className="shift-widget-header">
+                    <div className="shift-badge">
+                      <span className="shift-dot" />
+                      <span>{shiftStatus?.is_open ? "DAY OPEN" : "DAY CLOSED"}</span>
                     </div>
-                    <button
-                      type="button"
-                      className="btn-shift end"
-                      onClick={() => {
-                        loadShiftStatus();
-                        setEodForm({ closingCash: "", notes: "" });
-                        setShowEodModal(true);
-                      }}
-                    >
-                      <Sunset size={14} /> End of Day (EOD)
-                    </button>
+                    <span className="shift-date">
+                      {shiftStatus?.is_open ? shiftStatus.shift.business_date : "No active shift"}
+                    </span>
                   </div>
-                ) : (
-                  <div className="shift-widget-body">
-                    <p className="shift-subtext">Transactions will anchor to start date even past 12 midnight</p>
-                    <button
-                      type="button"
-                      className="btn-shift start"
-                      onClick={() => {
-                        setSodForm({ businessDate: ymd(), openingCash: "0", notes: "" });
-                        setShowSodModal(true);
-                      }}
-                    >
-                      <Sunrise size={14} /> Start of Day (SOD)
-                    </button>
-                  </div>
-                )}
-              </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1, overflowY: "auto" }}>
-                {allowedNav.map(({ id, label, icon: Icon }) => {
-                  const isGated = GATED_SHIFT_TABS.includes(id) && !shiftStatus?.is_open;
-                  return (
-                    <button
-                      key={id}
-                      id={`nav-${id}`}
-                      className={
-                        "nav-btn" +
-                        (tab === id ? " active" : "") +
-                        (isGated ? " gated-disabled" : "")
-                      }
-                      onClick={() => {
-                        if (isGated) {
+                  {shiftStatus?.is_open ? (
+                    <div className="shift-widget-body">
+                      <div className="shift-details">
+                        <span>Started: <b>{shiftStatus.shift.opened_at?.slice(11, 16) || "—"}</b></span>
+                        <span>Cash in drawer: <b>{peso(shiftStatus.shift.expected_cash)}</b></span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-shift end"
+                        onClick={() => {
+                          loadShiftStatus();
+                          setEodForm({ closingCash: "", notes: "" });
+                          setShowEodModal(true);
+                        }}
+                      >
+                        <Sunset size={14} /> End of Day (EOD)
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="shift-widget-body">
+                      <p className="shift-subtext">Transactions anchor to start date even past 12 midnight</p>
+                      <button
+                        type="button"
+                        className="btn-shift start"
+                        onClick={() => {
+                          setSodForm({ businessDate: ymd(), openingCash: "0", notes: "" });
                           setShowSodModal(true);
-                        } else {
-                          setTab(id);
-                        }
-                      }}
-                      title={
-                        isGated
-                          ? "Business day is closed. Click to Start Day (SOD) to enable."
-                          : label
-                      }
-                    >
-                      <Icon size={19} />
-                      <span style={{ flex: 1 }}>{label}</span>
-                      {isGated && (
-                        <span className="lock-pill" title="Requires active business shift">
-                          <Lock size={10} style={{ display: "inline", verticalAlign: "-1px", marginRight: 3 }} />
-                          SOD
-                        </span>
+                        }}
+                      >
+                        <Sunrise size={14} /> Start of Day (SOD)
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className={`shift-rail-btn ${shiftStatus?.is_open ? "open" : "closed"}`}
+                  title={
+                    shiftStatus?.is_open
+                      ? `Shift OPEN (${shiftStatus.shift.business_date}) • Drawer: ${peso(shiftStatus.shift.expected_cash)} — Click for EOD`
+                      : "Shift CLOSED — Click to Start Day (SOD)"
+                  }
+                  onClick={() => {
+                    if (shiftStatus?.is_open) {
+                      loadShiftStatus();
+                      setEodForm({ closingCash: "", notes: "" });
+                      setShowEodModal(true);
+                    } else {
+                      setSodForm({ businessDate: ymd(), openingCash: "0", notes: "" });
+                      setShowSodModal(true);
+                    }
+                  }}
+                >
+                  {shiftStatus?.is_open ? <Sunset size={17} /> : <Sunrise size={17} />}
+                </button>
+              )}
+
+              <nav className="sidebar-nav" aria-label="Main navigation">
+                {allowedNav.map(({ id, label, icon: Icon }, idx) => {
+                  const isGated = GATED_SHIFT_TABS.includes(id) && !shiftStatus?.is_open;
+                  const prevGroup = idx > 0 ? allowedNav[idx - 1].group : null;
+                  const curGroup = allowedNav[idx].group;
+                  return (
+                    <div key={id}>
+                      {!sidebarCollapsed && curGroup !== prevGroup && (
+                        <div className="nav-group-label">{curGroup}</div>
                       )}
-                    </button>
+                      <button
+                        id={`nav-${id}`}
+                        className={
+                          "nav-btn" +
+                          (tab === id ? " active" : "") +
+                          (isGated ? " gated-disabled" : "")
+                        }
+                        onClick={() => navigateTo(id)}
+                        title={
+                          isGated
+                            ? `${label} — Business day is closed. Click to Start Day (SOD).`
+                            : label
+                        }
+                      >
+                        <Icon size={18} style={{ flexShrink: 0 }} />
+                        {!sidebarCollapsed && <span style={{ flex: 1 }}>{label}</span>}
+                        {!sidebarCollapsed && isGated && (
+                          <span className="lock-pill" title="Requires active business shift">
+                            <Lock size={10} style={{ display: "inline", verticalAlign: "-1px", marginRight: 3 }} />
+                            SOD
+                          </span>
+                        )}
+                      </button>
+                    </div>
                   );
                 })}
-              </div>
+              </nav>
+
               <div className="sidebar-footer">
-                <div className="user-profile">
+                <div className="user-profile" title={`${currentUser.name || "User"} (${currentUser.role})`}>
                   <div className="user-avatar">{currentUser.role === "admin" ? "🛡️" : "👤"}</div>
-                  <div className="user-info">
-                    <span className="user-name">{currentUser.name || "User"}</span>
-                    <span className="user-role">{currentUser.role}</span>
-                  </div>
+                  {!sidebarCollapsed && (
+                    <div className="user-info">
+                      <span className="user-name">{currentUser.name || "User"}</span>
+                      <span className="user-role">{currentUser.role}</span>
+                    </div>
+                  )}
                   <button
                     className="btn-ghost btn-sm"
                     style={{ padding: "6px", minWidth: "unset" }}
-                    title="Lock screen"
+                    title="Lock screen / Switch user"
                     onClick={handleLogout}
                   >
                     <LogOut size={16} />
@@ -480,57 +787,529 @@ export default function App() {
                 </div>
               </div>
             </aside>
-            <main
-              className={"main" + (tab === "pos" && shiftStatus?.is_open ? " pos-main" : "")}
-              key={`${tab}-${branchKey}`}
-            >
-              {GATED_SHIFT_TABS.includes(tab) && !shiftStatus?.is_open ? (
-                <div className="shift-locked-screen">
-                  <div className="shift-locked-icon">
-                    <Sunrise size={42} />
-                  </div>
-                  <h2>Business Day is Closed</h2>
-                  <p>
-                    To guarantee transaction integrity and avoid cross-date bookkeeping issues,{" "}
-                    <b>{currentItem?.label || "This section"}</b> is disabled until a business day is started.
-                    Starting of Day (SOD) locks all subsequent sales, expenses, commissions, and payroll to that business date even past 12 midnight.
-                  </p>
-                  <div className="shift-locked-tabs">
-                    <span className="shift-locked-tab-chip"><Lock size={12} /> POS</span>
-                    <span className="shift-locked-tab-chip"><Lock size={12} /> Expenses</span>
-                    <span className="shift-locked-tab-chip"><Lock size={12} /> Commissions</span>
-                    <span className="shift-locked-tab-chip"><Lock size={12} /> LD Commissions</span>
-                    <span className="shift-locked-tab-chip"><Lock size={12} /> Salary</span>
-                  </div>
-                  <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
-                    <button
-                      type="button"
-                      className="btn"
-                      style={{ padding: "12px 28px", fontSize: 15 }}
-                      onClick={() => {
-                        setSodForm({ businessDate: ymd(), openingCash: "0", notes: "" });
-                        setShowSodModal(true);
-                      }}
-                    >
-                      <Sunrise size={18} /> Start of Day (SOD)
-                    </button>
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      onClick={() => setTab(currentUser.role === "admin" ? "admin-dashboard" : "dashboard")}
-                    >
-                      View Reports Dashboard
-                    </button>
+
+            <div className="workspace-shell">
+              {/* Top Navigation Bar */}
+              <header className="topbar no-print">
+                <div className="topbar-left">
+                  <button
+                    type="button"
+                    className="icon-btn mobile-menu-btn"
+                    onClick={() => setMobileNavOpen((o) => !o)}
+                    aria-label="Open navigation menu"
+                    title="Toggle navigation menu"
+                  >
+                    <Menu size={18} />
+                  </button>
+
+                  <div className="breadcrumbs" aria-label="Breadcrumb">
+                    <span className="crumb-root">{activeBranchName}</span>
+                    <ChevronRight size={13} className="crumb-sep" />
+                    <span className="crumb-group">{currentItem?.group || "Workspace"}</span>
+                    <ChevronRight size={13} className="crumb-sep" />
+                    <strong className="crumb-current">{currentItem?.label || "Dashboard"}</strong>
                   </div>
                 </div>
-              ) : Page ? (
-                <PageErrorBoundary key={`${tab}-${branchKey}`}>
-                  <Page />
-                </PageErrorBoundary>
-              ) : (
-                <div className="empty">No access to this section.</div>
-              )}
-            </main>
+
+                {/* Global Cross-Module Search */}
+                <div className="topbar-search" ref={searchRef}>
+                  <div className="search-input-wrap">
+                    <Search size={15} className="search-icon" />
+                    <input
+                      id="global-search-input"
+                      type="text"
+                      value={searchQuery}
+                      onFocus={() => setSearchOpen(true)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        setSearchOpen(true);
+                      }}
+                      placeholder="Search products, receipts, staff, expenses… (Ctrl+K)"
+                      aria-label="Global search"
+                    />
+                    {searchQuery && (
+                      <button
+                        type="button"
+                        className="search-clear-btn"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setSearchResults(null);
+                        }}
+                        title="Clear search"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+
+                  {searchOpen && searchQuery.trim().length > 0 && (
+                    <div className="topbar-dropdown search-dropdown">
+                      <div className="dropdown-head">
+                        <span>Search Results for “{searchQuery.trim()}”</span>
+                        <span className="muted">{searchLoading ? "Searching…" : `${totalSearchHits} found`}</span>
+                      </div>
+                      <div className="dropdown-body">
+                        {!searchLoading && totalSearchHits === 0 && (
+                          <div className="dropdown-empty">No matching records across products, sales, staff, or expenses.</div>
+                        )}
+
+                        {searchResults?.products?.length > 0 && (
+                          <div className="search-group">
+                            <div className="search-group-title">Products ({searchResults.products.length})</div>
+                            {searchResults.products.map((p) => (
+                              <button
+                                key={`p-${p.id}`}
+                                type="button"
+                                className="search-item"
+                                onClick={() => handleSearchResultClick("products", p)}
+                              >
+                                <div>
+                                  <b>{p.name}</b>
+                                  <span className="muted"> • {p.category || "General"}</span>
+                                </div>
+                                <div className="search-meta">
+                                  <span>{peso(p.price)}</span>
+                                  <span className={`badge ${p.stock <= 0 ? "tone-bad" : p.stock <= p.low_stock ? "tone-warn" : "tone-ok"}`}>
+                                    {p.stock} in stock
+                                  </span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {searchResults?.sales?.length > 0 && (
+                          <div className="search-group">
+                            <div className="search-group-title">Receipts & Sales ({searchResults.sales.length})</div>
+                            {searchResults.sales.map((s) => (
+                              <button
+                                key={`s-${s.id}`}
+                                type="button"
+                                className="search-item"
+                                onClick={() => handleSearchResultClick("sales", s)}
+                              >
+                                <div>
+                                  <b>{s.receipt_no}</b>
+                                  <span className="muted"> • {s.created_at}</span>
+                                </div>
+                                <div className="search-meta">
+                                  <b>{peso(s.total)}</b>
+                                  <span className={`badge ${s.status === "voided" ? "tone-bad" : "tone-ok"}`}>
+                                    {s.status}
+                                  </span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {searchResults?.employees?.length > 0 && (
+                          <div className="search-group">
+                            <div className="search-group-title">Employees ({searchResults.employees.length})</div>
+                            {searchResults.employees.map((emp) => (
+                              <button
+                                key={`emp-${emp.id}`}
+                                type="button"
+                                className="search-item"
+                                onClick={() => handleSearchResultClick("employees", emp)}
+                              >
+                                <div>
+                                  <b>{emp.name}</b>
+                                  <span className="muted"> • {emp.role || "Staff"}</span>
+                                </div>
+                                <span className="badge tone-info">{peso(emp.daily_rate)}/day</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {searchResults?.expenses?.length > 0 && (
+                          <div className="search-group">
+                            <div className="search-group-title">Expenses ({searchResults.expenses.length})</div>
+                            {searchResults.expenses.map((ex) => (
+                              <button
+                                key={`ex-${ex.id}`}
+                                type="button"
+                                className="search-item"
+                                onClick={() => handleSearchResultClick("expenses", ex)}
+                              >
+                                <div>
+                                  <b>{ex.category}</b>
+                                  <span className="muted"> • {ex.description || ex.incurred_on}</span>
+                                </div>
+                                <span className="badge tone-warn">{peso(ex.amount)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {(searchResults?.salaries?.length > 0 ||
+                          searchResults?.commissions?.length > 0 ||
+                          searchResults?.ld_commissions?.length > 0) && (
+                          <div className="search-group">
+                            <div className="search-group-title">Payroll & Commissions</div>
+                            {(searchResults.salaries || []).map((sal) => (
+                              <button
+                                key={`sal-${sal.id}`}
+                                type="button"
+                                className="search-item"
+                                onClick={() => handleSearchResultClick("salaries", sal)}
+                              >
+                                <div>
+                                  <b>Salary: {sal.staff_name}</b>
+                                  <span className="muted"> • {sal.paid_on}</span>
+                                </div>
+                                <span className="badge tone-info">{peso(sal.amount)}</span>
+                              </button>
+                            ))}
+                            {(searchResults.commissions || []).map((c) => (
+                              <button
+                                key={`com-${c.id}`}
+                                type="button"
+                                className="search-item"
+                                onClick={() => handleSearchResultClick("commissions", c)}
+                              >
+                                <div>
+                                  <b>Commission: {c.staff_name}</b>
+                                  <span className="muted"> • {c.commission_type} ({c.earned_on})</span>
+                                </div>
+                                <span className="badge tone-purple">{peso(c.amount)}</span>
+                              </button>
+                            ))}
+                            {(searchResults.ld_commissions || []).map((ld) => (
+                              <button
+                                key={`ld-${ld.id}`}
+                                type="button"
+                                className="search-item"
+                                onClick={() => handleSearchResultClick("ld_commissions", ld)}
+                              >
+                                <div>
+                                  <b>LD Commission: {ld.staff_name}</b>
+                                  <span className="muted"> • {ld.quantity} Ladies Drink ({ld.earned_on})</span>
+                                </div>
+                                <span className="badge tone-purple">{peso(ld.total)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Topbar Right Actions: Quick Actions, Shift Badge, Notifications, Theme, Profile */}
+                <div className="topbar-right">
+                  {/* Quick Actions Menu */}
+                  <div className="topbar-popover-wrap" ref={quickRef}>
+                    <button
+                      type="button"
+                      className="btn sm ghost topbar-action-btn"
+                      onClick={() => setQuickMenuOpen((o) => !o)}
+                      title="Quick Actions & Shortcuts"
+                    >
+                      <Zap size={15} color="var(--accent)" />
+                      <span className="hide-sm">Quick Actions</span>
+                    </button>
+                    {quickMenuOpen && (
+                      <div className="topbar-dropdown quick-dropdown">
+                        <div className="dropdown-head">
+                          <span>Quick Actions</span>
+                        </div>
+                        <div className="dropdown-body">
+                          <button
+                            type="button"
+                            className="dropdown-action-item"
+                            onClick={() => {
+                              setQuickMenuOpen(false);
+                              navigateTo("pos");
+                            }}
+                          >
+                            <ShoppingCart size={15} /> Open POS Terminal
+                          </button>
+                          {currentUser.role === "admin" && (
+                            <>
+                              <button
+                                type="button"
+                                className="dropdown-action-item"
+                                onClick={() => {
+                                  setQuickMenuOpen(false);
+                                  navigateToAdminReport("products", { openModal: "add-product" });
+                                }}
+                              >
+                                <Package size={15} /> Add New Product
+                              </button>
+                              <button
+                                type="button"
+                                className="dropdown-action-item"
+                                onClick={() => {
+                                  setQuickMenuOpen(false);
+                                  navigateToAdminReport("expenses", { openModal: "add-expense" });
+                                }}
+                              >
+                                <ReceiptIcon size={15} /> Record Store Expense
+                              </button>
+                              <button
+                                type="button"
+                                className="dropdown-action-item"
+                                onClick={() => {
+                                  setQuickMenuOpen(false);
+                                  navigateToAdminReport("salaries", { openModal: "add-salary" });
+                                }}
+                              >
+                                <Wallet size={15} /> Record Staff Salary
+                              </button>
+                              <button
+                                type="button"
+                                className="dropdown-action-item"
+                                onClick={() => {
+                                  setQuickMenuOpen(false);
+                                  navigateToAdminReport("ld-commissions", { openModal: "add-ld" });
+                                }}
+                              >
+                                <Smartphone size={15} /> Log LD Commission
+                              </button>
+                              <button
+                                type="button"
+                                className="dropdown-action-item"
+                                onClick={() => {
+                                  setQuickMenuOpen(false);
+                                  navigateToAdminReport("audit", {});
+                                }}
+                              >
+                                <ShieldCheck size={15} /> View Audit Trail
+                              </button>
+                            </>
+                          )}
+                          <button
+                            type="button"
+                            className="dropdown-action-item"
+                            onClick={() => {
+                              setQuickMenuOpen(false);
+                              if (shiftStatus?.is_open) {
+                                loadShiftStatus();
+                                setEodForm({ closingCash: "", notes: "" });
+                                setShowEodModal(true);
+                              } else {
+                                setSodForm({ businessDate: ymd(), openingCash: "0", notes: "" });
+                                setShowSodModal(true);
+                              }
+                            }}
+                          >
+                            {shiftStatus?.is_open ? <Sunset size={15} /> : <Sunrise size={15} />}
+                            {shiftStatus?.is_open ? "Execute End of Day (EOD)" : "Start Business Day (SOD)"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Notifications & Important Alerts Bell */}
+                  <div className="topbar-popover-wrap" ref={notifRef}>
+                    <button
+                      type="button"
+                      className="icon-btn notif-btn"
+                      onClick={() => {
+                        setNotifOpen((o) => !o);
+                        refreshAlerts();
+                      }}
+                      title="System Alerts & Notifications"
+                      aria-label="Notifications"
+                    >
+                      <Bell size={17} />
+                      {visibleAlerts.length > 0 && (
+                        <span className="notif-badge">{visibleAlerts.length}</span>
+                      )}
+                    </button>
+
+                    {notifOpen && (
+                      <div className="topbar-dropdown notif-dropdown">
+                        <div className="dropdown-head">
+                          <span>Important Alerts ({visibleAlerts.length})</span>
+                          {dismissedAlertIds.length > 0 && (
+                            <button
+                              type="button"
+                              className="link-btn"
+                              onClick={clearDismissedAlerts}
+                              title="Restore dismissed alerts"
+                            >
+                              Restore all
+                            </button>
+                          )}
+                        </div>
+                        <div className="dropdown-body">
+                          {visibleAlerts.length === 0 ? (
+                            <div className="dropdown-empty">
+                              <CheckCheck size={24} color="var(--ok)" style={{ margin: "0 auto 6px" }} />
+                              <div>All clear! No critical stock, shift, or financial alerts.</div>
+                            </div>
+                          ) : (
+                            visibleAlerts.map((a) => (
+                              <div key={a.id} className={`notif-item severity-${a.severity || "info"}`}>
+                                <div
+                                  className="notif-main"
+                                  onClick={() => handleAlertClick(a)}
+                                  role="button"
+                                  tabIndex={0}
+                                >
+                                  <div className="notif-title-row">
+                                    {a.severity === "bad" ? (
+                                      <AlertCircle size={15} color="var(--bad)" />
+                                    ) : a.severity === "warn" ? (
+                                      <AlertTriangle size={15} color="var(--warn)" />
+                                    ) : (
+                                      <Info size={15} color="var(--info)" />
+                                    )}
+                                    <b>{a.title}</b>
+                                  </div>
+                                  <p>{a.message}</p>
+                                  <span className="notif-cta">
+                                    Inspect in Report <ExternalLink size={11} />
+                                  </span>
+                                </div>
+                                <button
+                                  type="button"
+                                  className="icon-btn sm"
+                                  title="Dismiss alert"
+                                  onClick={() => dismissAlert(a.id)}
+                                >
+                                  <X size={13} />
+                                </button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Theme Toggle */}
+                  <button
+                    type="button"
+                    className="icon-btn"
+                    onClick={toggleTheme}
+                    title="Toggle Light / Dark theme"
+                    aria-label="Toggle theme"
+                  >
+                    {(settings.theme || localStorage.getItem("joyce-theme") || "dark") === "dark" ? (
+                      <Sun size={17} />
+                    ) : (
+                      <Moon size={17} />
+                    )}
+                  </button>
+
+                  {/* User Account Menu */}
+                  <div className="topbar-popover-wrap" ref={userRef}>
+                    <button
+                      type="button"
+                      className="topbar-user-btn"
+                      onClick={() => setUserMenuOpen((o) => !o)}
+                      title="Account & Session Menu"
+                    >
+                      <span className="topbar-avatar">{currentUser.role === "admin" ? "🛡️" : "👤"}</span>
+                      <span className="hide-sm topbar-username">{currentUser.name || "User"}</span>
+                      <span className={`badge ${currentUser.role === "admin" ? "tone-ok" : "tone-info"} hide-sm`}>
+                        {currentUser.role}
+                      </span>
+                    </button>
+                    {userMenuOpen && (
+                      <div className="topbar-dropdown user-dropdown">
+                        <div className="dropdown-head">
+                          <div>
+                            <b>{currentUser.name || "User"}</b>
+                            <div className="muted" style={{ fontSize: 11 }}>
+                              Role: {currentUser.role.toUpperCase()} • {activeBranchName}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="dropdown-body">
+                          {currentUser.role === "admin" && (
+                            <button
+                              type="button"
+                              className="dropdown-action-item"
+                              onClick={() => {
+                                setUserMenuOpen(false);
+                                navigateTo("admin-dashboard");
+                              }}
+                            >
+                              <ShieldCheck size={15} /> Admin Analytics & Reports
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="dropdown-action-item"
+                            onClick={() => {
+                              setUserMenuOpen(false);
+                              navigateTo("settings");
+                            }}
+                          >
+                            <Cog size={15} /> System & Branch Settings
+                          </button>
+                          <button
+                            type="button"
+                            className="dropdown-action-item danger-text"
+                            onClick={handleLogout}
+                          >
+                            <LogOut size={15} /> Lock Screen / Switch User
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </header>
+
+              <main
+                className={"main" + (tab === "pos" && shiftStatus?.is_open ? " pos-main" : "")}
+                key={`${tab}-${branchKey}`}
+              >
+                {GATED_SHIFT_TABS.includes(tab) && !shiftStatus?.is_open ? (
+                  <div className="shift-locked-screen">
+                    <div className="shift-locked-icon">
+                      <Sunrise size={42} />
+                    </div>
+                    <h2>Business Day is Closed</h2>
+                    <p>
+                      To guarantee transaction integrity and avoid cross-date bookkeeping issues,{" "}
+                      <b>{currentItem?.label || "This section"}</b> is disabled until a business day is started.
+                      Starting of Day (SOD) locks all subsequent sales, expenses, commissions, and payroll to that business date even past 12 midnight.
+                    </p>
+                    <div className="shift-locked-tabs">
+                      <span className="shift-locked-tab-chip"><Lock size={12} /> POS</span>
+                      <span className="shift-locked-tab-chip"><Lock size={12} /> Expenses</span>
+                      <span className="shift-locked-tab-chip"><Lock size={12} /> Commissions</span>
+                      <span className="shift-locked-tab-chip"><Lock size={12} /> LD Commissions</span>
+                      <span className="shift-locked-tab-chip"><Lock size={12} /> Salary</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ padding: "12px 28px", fontSize: 15 }}
+                        onClick={() => {
+                          setSodForm({ businessDate: ymd(), openingCash: "0", notes: "" });
+                          setShowSodModal(true);
+                        }}
+                      >
+                        <Sunrise size={18} /> Start of Day (SOD)
+                      </button>
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        onClick={() => setTab(currentUser.role === "admin" ? "admin-dashboard" : "dashboard")}
+                      >
+                        View Reports Dashboard
+                      </button>
+                    </div>
+                  </div>
+                ) : Page ? (
+                  <PageErrorBoundary key={`${tab}-${branchKey}`}>
+                    <Page />
+                  </PageErrorBoundary>
+                ) : (
+                  <div className="empty">No access to this section.</div>
+                )}
+              </main>
+            </div>
 
             {/* Create Branch Modal */}
             {showAddBranch && (
@@ -661,7 +1440,7 @@ export default function App() {
                       </div>
                       <div>
                         <span className="muted">Branch:</span><br />
-                        <b>{branchInfo?.branches?.find((b) => b.id === branchInfo.active_branch)?.name || "Main Store"}</b>
+                        <b>{activeBranchName}</b>
                       </div>
                       <div>
                         <span className="muted">Opened By:</span><br />

@@ -60,4 +60,7 @@ export const api = {
   createBranch: (name) => call("create_branch", { name }),
   deleteBranch: (branchId) => call("delete_branch", { branchId }),
   setStorageDir: (storageDir) => call("set_storage_dir", { storageDir }),
+  auditLogs: (from, to, limit = 250) => call("list_audit_logs", { from, to, limit }),
+  globalSearch: (query) => call("global_search", { query }),
+  updateShiftNotes: (id, notes) => call("update_shift_notes", { id, notes }),
 };
