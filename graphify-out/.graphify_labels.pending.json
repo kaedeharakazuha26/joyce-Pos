@@ -5,12 +5,16 @@
   "3": "tauri.conf.json",
   "4": "ui.jsx",
   "5": "App.jsx",
+  "6": "R",
   "7": "db.rs",
-  "8": "cmds.rs",
+  "8": "Db",
   "9": "default.json",
   "10": "set-version.mjs",
   "11": "build.rs",
   "12": "main.rs",
   "13": "joyce-pos",
+  "14": "cmds.rs",
+  "15": "Connection",
+  "16": "perform_eod_snapshot",
   "20": "JOYCE POS"
 }

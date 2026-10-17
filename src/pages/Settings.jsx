@@ -250,24 +250,38 @@ export default function Settings() {
     try {
       const selected = await openDialog({
         directory: true,
-        title: "Select Google Drive Synced Folder",
+        title: "Select Google Drive Backup Folder",
       });
       if (selected) {
         await api.setStorageDir(selected);
         await refreshBranchInfo();
-        toast("Database folder updated to Google Drive folder!");
+        toast("Google Drive EOD Backup folder configured & initial snapshot saved!");
       }
     } catch (e) {
       toast(errText(e), "err");
     }
   };
 
+  const handleSyncToGdrive = async () => {
+    try {
+      const res = await api.syncToGdrive();
+      await refreshBranchInfo();
+      toast(
+        res?.is_google_drive
+          ? `Clean snapshot backed up to Google Drive (${res.archive_path})`
+          : `Clean snapshot saved to local EOD_Backups (${res?.archive_path || ""})`
+      );
+    } catch (e) {
+      toast(errText(e), "err");
+    }
+  };
+
   const handleResetStorageDir = async () => {
-    if (!confirm("Reset database location to default local app folder?")) return;
+    if (!confirm("Disconnect Google Drive backup folder and keep EOD backups only in the default local folder?")) return;
     try {
       await api.setStorageDir("");
       await refreshBranchInfo();
-      toast("Reset to default local folder");
+      toast("Disconnected Google Drive backup folder (using local EOD_Backups)");
     } catch (e) {
       toast(errText(e), "err");
     }
@@ -424,38 +438,65 @@ export default function Settings() {
 
       {tab === "branches" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Google Drive Location Card */}
+          {/* Google Drive Safe EOD Backup Card */}
           <div className="card">
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-              <Cloud size={22} color="var(--accent)" />
-              <h3 style={{ margin: 0 }}>Google Drive & Database Location</h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Cloud size={22} color="var(--accent)" />
+                <h3 style={{ margin: 0 }}>Safe End-of-Day (EOD) Google Drive Backup</h3>
+              </div>
+              <span className="badge ok">🛡️ Corruption-Proof & Lock-Free Mode</span>
             </div>
-            <p className="muted" style={{ marginBottom: 16 }}>
-              Point the database storage folder to your local <b>Google Drive synced folder</b> (e.g. <code>Google Drive/JOYCE_POS</code>) to automatically sync sales from branch stores to the office in real-time.
+            <p className="muted" style={{ marginBottom: 16, lineHeight: 1.55 }}>
+              To prevent <b>database locking</b> and <b>file corruption</b> during busy store hours, your live working database always runs on fast <b>Local Storage</b>. Whenever you close a shift with <b>End of Day (EOD)</b> (or click <i>"Backup Snapshot Now"</i> below), JOYCE POS creates a single-file, corruption-proof atomic snapshot (<code>VACUUM INTO</code>) inside your <b>Google Drive folder</b>!
             </p>
 
-            <div style={{ padding: 14, background: "var(--card-solid)", borderRadius: 10, border: "1px solid var(--border)", marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span className="muted" style={{ fontSize: 12, fontWeight: 600 }}>CURRENT STORAGE FOLDER</span>
-                <span className={"badge " + (branchInfo?.storage_dir ? "ok" : "warn")}>
-                  {branchInfo?.storage_dir ? "☁️ Google Drive / Custom Folder" : "💻 Local Default Storage"}
-                </span>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginBottom: 16 }}>
+              <div style={{ padding: 14, background: "var(--card-solid)", borderRadius: 10, border: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span className="muted" style={{ fontSize: 11, fontWeight: 700 }}>1. LIVE WORKING DATABASE (LOCAL DISK)</span>
+                  <span className="badge tone-info">⚡ Zero Cloud Locks</span>
+                </div>
+                <code style={{ display: "block", wordBreak: "break-all", fontSize: 12, color: "var(--text)" }}>
+                  {branchInfo?.active_db_path || branchInfo?.default_dir || "Loading local path…"}
+                </code>
+                <div style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
+                  All live POS sales, WAL logs, and stock updates run here at full speed without Google Drive locking files.
+                </div>
               </div>
-              <code style={{ display: "block", wordBreak: "break-all", fontSize: 13, color: "var(--text)" }}>
-                {branchInfo?.storage_dir || branchInfo?.default_dir || "Loading directory…"}
-              </code>
-              <div style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
-                Active Database: <b>{branchInfo?.active_db_path?.split("/").pop() || "joyce_pos.db"}</b>
+
+              <div style={{ padding: 14, background: "var(--card-solid)", borderRadius: 10, border: "1px solid var(--border)" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <span className="muted" style={{ fontSize: 11, fontWeight: 700 }}>2. END-OF-DAY GOOGLE DRIVE BACKUP FOLDER</span>
+                  <span className={"badge " + (branchInfo?.storage_dir ? "ok" : "warn")}>
+                    {branchInfo?.storage_dir ? "☁️ Google Drive Connected" : "📁 Local EOD_Backups Only"}
+                  </span>
+                </div>
+                <code style={{ display: "block", wordBreak: "break-all", fontSize: 12, color: "var(--text)" }}>
+                  {branchInfo?.storage_dir
+                    ? `${branchInfo.storage_dir}/EOD_Backups`
+                    : `${branchInfo?.default_dir || "."}/EOD_Backups`}
+                </code>
+                <div style={{ marginTop: 8, fontSize: 12, color: "var(--muted)" }}>
+                  {branchInfo?.last_backup_at ? (
+                    <>Last EOD / Cloud Snapshot: <b>{branchInfo.last_backup_at}</b></>
+                  ) : (
+                    <>Automatically saves every End of Day (EOD) or whenever you click Backup Now.</>
+                  )}
+                </div>
               </div>
             </div>
 
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button className="btn" onClick={handlePickStorageDir}>
-                <FolderOpen size={16} /> Choose Google Drive Folder
+                <FolderOpen size={16} /> Choose Google Drive Backup Folder
+              </button>
+              <button className="btn ghost" onClick={handleSyncToGdrive}>
+                <DatabaseBackup size={16} /> Backup Snapshot to Google Drive Now
               </button>
               {branchInfo?.storage_dir && (
                 <button className="btn ghost" onClick={handleResetStorageDir}>
-                  Reset to Local Storage
+                  Disconnect Google Drive Folder
                 </button>
               )}
             </div>
@@ -584,19 +625,24 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Google Drive Guide Card */}
+          {/* Student-Friendly Guide Card: Why EOD Backup Prevents Corruption */}
           <div className="card">
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <Info size={18} color="var(--accent)" />
-              <h4 style={{ margin: 0 }}>How Google Drive Multi-Area Sync Works</h4>
+              <h4 style={{ margin: 0 }}>📚 Student Guide: Why End-of-Day (EOD) Backup Prevents Database Locking & Corruption</h4>
             </div>
-            <ol style={{ paddingLeft: 20, margin: 0, fontSize: 13, lineHeight: "1.7", color: "var(--muted)" }}>
-              <li>Install <b>Google Drive for Desktop</b> on your Office PC and branch POS terminals.</li>
-              <li>Create a shared folder in Google Drive (e.g. <code>My Drive/JOYCE_POS_DATA</code>).</li>
-              <li>On all computers, click <b>"Choose Google Drive Folder"</b> above and select that folder.</li>
-              <li>Each branch operates in its own dedicated database (e.g. <code>joyce_pos_taguig.db</code>), avoiding SQLite locking issues.</li>
-              <li>At the office, the admin can switch between branches in the top-left dropdown to review sales, inventory, and highest employee income in real-time!</li>
-            </ol>
+            <div style={{ fontSize: 13, lineHeight: 1.7, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 8 }}>
+              <div>
+                <b>1. Why Real-Time Cloud Sync Can Break Live SQLite Databases:</b><br />
+                When SQLite is actively recording sales, it uses 3 linked files at the same time: the main database (<code>.db</code>), the Write-Ahead Log (<code>.db-wal</code>), and shared memory (<code>.db-shm</code>). If Google Drive tries to upload those 3 files in the middle of a sale, Google Drive can lock the file (causing <i>"Database is locked"</i> errors) or upload the <code>.db</code> file without the matching <code>.db-wal</code> file (causing database corruption).
+              </div>
+              <div>
+                <b>2. How Our End-of-Day (EOD) Atomic Snapshot Solves This 100%:</b><br />
+                • <b>During Store Hours:</b> Your POS works strictly on your computer's local hard drive (<code>default_dir</code>). Google Drive never touches or locks your live files while cashiers are ringing up customers.<br />
+                • <b>At End of Day (EOD):</b> When you click <b>Confirm End of Day</b>, SQLite runs a special command called <code>VACUUM INTO</code>. It safely packages the entire database into a single, finished, corruption-proof <code>.db</code> file inside your Google Drive <code>EOD_Backups/</code> folder (e.g., <code>joyce_pos_main_EOD_2026-10-18.db</code>) AND updates the latest branch copy in Google Drive.<br />
+                • <b>Result:</b> Zero file locking during the day, zero partial uploads, and a permanent daily backup history in Google Drive!
+              </div>
+            </div>
           </div>
         </div>
       )}

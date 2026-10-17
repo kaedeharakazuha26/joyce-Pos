@@ -32,132 +32,166 @@ export function AdminKpiGrid({
   }
 
   const fin = data?.financials || {};
-  const prev = data?.previous_period || {};
+  const prev = data?.previous_period || data?.previous || {};
   const todayStats = data?.today || {};
   const mtdStats = data?.mtd || {};
   const counts = data?.counts || {};
 
-  const revCompare = pctChange(fin.revenue, prev.revenue);
-  const netCompare = pctChange(fin.net_profit, prev.net_profit);
-  const grossCompare = pctChange(fin.gross_profit, prev.gross_profit);
-  const overheadCompare = pctChange(fin.total_overheads, prev.total_overheads);
+  const grossSales = Number(fin.gross_sales ?? fin.revenue ?? data?.revenue ?? 0);
+  const prevSales = Number(prev.revenue ?? prev.gross_sales ?? 0);
+  const cogs = Number(fin.cogs ?? data?.cogs ?? 0);
+  const grossProfit = Number(fin.gross_profit ?? data?.gross_profit ?? 0);
+  const prevGross = Number(prev.gross_profit ?? 0);
+  const totalOverheads = Number(fin.total_overheads ?? data?.total_overheads ?? 0);
+  const prevOverheads = Number(prev.total_overheads ?? 0);
+  const netProfit = Number(fin.net_profit ?? data?.net_profit ?? 0);
+  const prevNet = Number(prev.net_profit ?? 0);
+
+  const expensesAmt = Number(fin.expenses_total ?? fin.expenses ?? data?.expenses ?? 0);
+  const salariesAmt = Number(fin.salaries_total ?? fin.salaries ?? data?.salaries ?? 0);
+  const commAmt = Number(fin.commissions_total ?? fin.commissions ?? data?.commissions ?? 0);
+  const ldCommAmt = Number(fin.ld_commissions_total ?? fin.ld_commissions ?? data?.ld_commissions ?? 0);
+
+  const ordersCount = Number(fin.completed_orders ?? fin.orders ?? data?.orders ?? 0);
+  const avgTicket = Number(fin.avg_ticket ?? data?.avg_ticket ?? 0);
+  const grossMarginPct = Number(fin.gross_margin_pct ?? data?.gross_margin ?? 0);
+  const netMarginPct = Number(fin.net_margin_pct ?? data?.net_margin ?? 0);
+
+  const todaySales = Number(todayStats.sales ?? todayStats.revenue ?? 0);
+  const todayNet = Number(todayStats.net_profit ?? 0);
+  const todayOrders = Number(todayStats.orders ?? 0);
+
+  const mtdSales = Number(mtdStats.sales ?? mtdStats.revenue ?? 0);
+  const mtdNet = Number(mtdStats.net_profit ?? 0);
+  const mtdOverheads = Number(mtdStats.overheads ?? mtdStats.total_overheads ?? 0);
+
+  const stockRetailVal = Number(fin.inventory_retail_value ?? data?.inventory_retail ?? 0);
+  const stockCostVal = Number(fin.inventory_cost_value ?? data?.inventory_cost ?? 0);
+  const outCount = Number(counts.out_of_stock ?? counts.products_out_of_stock ?? 0);
+  const lowCount = Number(counts.low_stock ?? counts.products_low_stock ?? 0);
+  const okCount = Number(counts.healthy_stock ?? counts.products_healthy ?? 0);
+
+  const voidTotal = Number(fin.voided_total ?? data?.voided_total ?? 0);
+  const voidCount = Number(fin.voided_count ?? data?.voided_count ?? 0);
+
+  const revCompare = pctChange(grossSales, prevSales);
+  const netCompare = pctChange(netProfit, prevNet);
+  const grossCompare = pctChange(grossProfit, prevGross);
+  const overheadCompare = pctChange(totalOverheads, prevOverheads);
 
   return (
     <section className="kpi-grid-modern" aria-label="Key Performance Indicators">
-      {/* Card 1: Gross Sales Revenue */}
+      {/* Card 1: Total Sales (Money In) */}
       <div
         className="kpi-card-v2 tone-ok"
         onClick={() => jumpToReport("sales", { status: "completed" })}
         role="button"
         tabIndex={0}
-        title="Click to inspect Completed Sales & Receipts"
+        title="Click to view all completed customer receipts"
       >
         <div className="kpi-head">
-          <span className="kpi-title">Gross Sales Revenue</span>
+          <span className="kpi-title">1. Total Sales (Money In)</span>
           <span className="kpi-icon-box tone-ok"><TrendingUp size={17} /></span>
         </div>
-        <div className="kpi-val">{peso(fin.revenue)}</div>
+        <div className="kpi-val">{peso(grossSales)}</div>
         <div className="kpi-compare-row">
           <StatusBadge
             tone={revCompare.delta >= 0 ? "ok" : "bad"}
             label={`${revCompare.delta >= 0 ? "+" : ""}${revCompare.pct.toFixed(1)}% (${revCompare.delta >= 0 ? "+" : ""}${pesoShort(revCompare.delta)})`}
           />
-          <span className="kpi-sub">vs prev period</span>
+          <span className="kpi-sub">vs previous period</span>
         </div>
         <div className="kpi-foot">
-          <span><b>{fin.orders || 0}</b> completed receipts • Avg <b>{peso(fin.avg_ticket)}</b></span>
+          <span><b>{ordersCount}</b> paid receipts • Avg <b>{peso(avgTicket)}</b>/order</span>
           <ExternalLink size={12} />
         </div>
       </div>
 
-      {/* Card 2: Net Operating Profit */}
-      <div
-        className={`kpi-card-v2 ${Number(fin.net_profit || 0) >= 0 ? "tone-ok" : "tone-bad"}`}
-        onClick={() => jumpToReport("overview")}
-        role="button"
-        tabIndex={0}
-        title="Click to view full P&L Breakdown"
-      >
-        <div className="kpi-head">
-          <span className="kpi-title">Net Operating Profit</span>
-          <span className={`kpi-icon-box ${Number(fin.net_profit || 0) >= 0 ? "tone-ok" : "tone-bad"}`}>
-            <ShieldCheck size={17} />
-          </span>
-        </div>
-        <div
-          className="kpi-val"
-          style={{ color: Number(fin.net_profit || 0) >= 0 ? "var(--ok)" : "var(--bad)" }}
-        >
-          {peso(fin.net_profit)}
-        </div>
-        <div className="kpi-compare-row">
-          <StatusBadge
-            tone={netCompare.delta >= 0 ? "ok" : "bad"}
-            label={`${netCompare.delta >= 0 ? "+" : ""}${netCompare.pct.toFixed(1)}% (${netCompare.delta >= 0 ? "+" : ""}${pesoShort(netCompare.delta)})`}
-          />
-          <span className="kpi-sub">Net Margin {Number(fin.net_margin_pct || 0).toFixed(1)}%</span>
-        </div>
-        <div className="kpi-foot">
-          <span>After COGS, Expenses, Salaries & Commissions</span>
-          <ExternalLink size={12} />
-        </div>
-      </div>
-
-      {/* Card 3: Gross Profit & COGS */}
+      {/* Card 2: Gross Profit (Sales minus Product Cost) */}
       <div
         className="kpi-card-v2 tone-info"
         onClick={() => jumpToReport("products")}
         role="button"
         tabIndex={0}
-        title="Click to inspect Product Profitability & Margins"
+        title="Click to see item costs vs selling prices"
       >
         <div className="kpi-head">
-          <span className="kpi-title">Gross Profit (Sales − COGS)</span>
+          <span className="kpi-title">2. Gross Profit (Sales − Cost)</span>
           <span className="kpi-icon-box tone-info"><BarChart3 size={17} /></span>
         </div>
-        <div className="kpi-val">{peso(fin.gross_profit)}</div>
+        <div className="kpi-val">{peso(grossProfit)}</div>
         <div className="kpi-compare-row">
           <StatusBadge
             tone={grossCompare.delta >= 0 ? "ok" : "bad"}
-            label={`${grossCompare.delta >= 0 ? "+" : ""}${grossCompare.pct.toFixed(1)}%`}
+            label={`Margin: ${grossMarginPct.toFixed(1)}%`}
           />
-          <span className="kpi-sub">Gross Margin {Number(fin.gross_margin_pct || 0).toFixed(1)}%</span>
+          <span className="kpi-sub">Item Cost (COGS): <b>{peso(cogs)}</b></span>
         </div>
         <div className="kpi-foot">
-          <span>COGS: <b>{peso(fin.cogs)}</b></span>
+          <span>Money left after paying supplier item cost</span>
           <ExternalLink size={12} />
         </div>
       </div>
 
-      {/* Card 4: Total Overheads */}
+      {/* Card 3: Store Expenses & Staff Pay */}
       <div
         className="kpi-card-v2 tone-warn"
         onClick={() => jumpToReport("expenses")}
         role="button"
         tabIndex={0}
-        title="Click to manage Expenses, Payroll, and Commissions"
+        title="Click to view or add Store Expenses, Salaries & Commissions"
       >
         <div className="kpi-head">
-          <span className="kpi-title">Total Operating Overheads</span>
+          <span className="kpi-title">3. Expenses & Staff Pay</span>
           <span className="kpi-icon-box tone-warn"><Wallet size={17} /></span>
         </div>
-        <div className="kpi-val">{peso(fin.total_overheads)}</div>
+        <div className="kpi-val">{peso(totalOverheads)}</div>
         <div className="kpi-compare-row">
           <StatusBadge
             tone={overheadCompare.delta <= 0 ? "ok" : "warn"}
-            label={`${overheadCompare.delta >= 0 ? "+" : ""}${overheadCompare.pct.toFixed(1)}% vs prev`}
+            label={`Bills: ${pesoShort(expensesAmt)} • Staff: ${pesoShort(salariesAmt + commAmt + ldCommAmt)}`}
           />
-          <span className="kpi-sub">
-            Exp {pesoShort(fin.expenses)} • Pay {pesoShort((fin.salaries || 0) + (fin.commissions || 0) + (fin.ld_commissions || 0))}
-          </span>
         </div>
         <div className="kpi-foot">
-          <span>Sal {pesoShort(fin.salaries)} • Comm {pesoShort(fin.commissions)} • LD {pesoShort(fin.ld_commissions)}</span>
+          <span>Sal {pesoShort(salariesAmt)} • Comm {pesoShort(commAmt)} • LD {pesoShort(ldCommAmt)}</span>
           <ExternalLink size={12} />
         </div>
       </div>
 
-      {/* Card 5: Today's Live Performance */}
+      {/* Card 4: Take-Home Net Profit */}
+      <div
+        className={`kpi-card-v2 ${netProfit >= 0 ? "tone-ok" : "tone-bad"}`}
+        onClick={() => jumpToReport("overview")}
+        role="button"
+        tabIndex={0}
+        title="Click to see the step-by-step Profit & Loss (P&L) table"
+      >
+        <div className="kpi-head">
+          <span className="kpi-title">4. Take-Home Net Profit</span>
+          <span className={`kpi-icon-box ${netProfit >= 0 ? "tone-ok" : "tone-bad"}`}>
+            <ShieldCheck size={17} />
+          </span>
+        </div>
+        <div
+          className="kpi-val"
+          style={{ color: netProfit >= 0 ? "var(--ok)" : "var(--bad)" }}
+        >
+          {peso(netProfit)}
+        </div>
+        <div className="kpi-compare-row">
+          <StatusBadge
+            tone={netProfit >= 0 ? "ok" : "bad"}
+            label={netProfit >= 0 ? `PROFIT (${netMarginPct.toFixed(1)}% margin)` : `LOSS (${netMarginPct.toFixed(1)}%)`}
+          />
+          <span className="kpi-sub">{netCompare.delta >= 0 ? "+" : ""}{pesoShort(netCompare.delta)} vs prev</span>
+        </div>
+        <div className="kpi-foot">
+          <span>Gross Profit minus all Bills & Staff Pay</span>
+          <ExternalLink size={12} />
+        </div>
+      </div>
+
+      {/* Card 5: Today's Live Sales */}
       <div
         className="kpi-card-v2 tone-info"
         onClick={() => {
@@ -167,27 +201,27 @@ export function AdminKpiGrid({
         }}
         role="button"
         tabIndex={0}
-        title="Click to filter dashboard to Active Business Date"
+        title="Click to filter dashboard to Today only"
       >
         <div className="kpi-head">
-          <span className="kpi-title">Today ({todayStats.business_date || activeBusinessDate})</span>
+          <span className="kpi-title">Today's Sales ({todayStats.date || activeBusinessDate})</span>
           <span className="kpi-icon-box tone-info"><Sparkles size={17} /></span>
         </div>
-        <div className="kpi-val">{peso(todayStats.revenue)}</div>
+        <div className="kpi-val">{peso(todaySales)}</div>
         <div className="kpi-compare-row">
           <StatusBadge
-            tone={Number(todayStats.net_profit || 0) >= 0 ? "ok" : "bad"}
-            label={`Net Today: ${peso(todayStats.net_profit)}`}
+            tone={todayNet >= 0 ? "ok" : "bad"}
+            label={`Today's Net: ${peso(todayNet)}`}
           />
-          <span className="kpi-sub">{todayStats.orders || 0} orders</span>
+          <span className="kpi-sub">{todayOrders} orders today</span>
         </div>
         <div className="kpi-foot">
-          <span><b>{todayStats.records_created || 0}</b> records created today</span>
+          <span><b>{todayStats.records_created || 0}</b> new records logged today</span>
           <ExternalLink size={12} />
         </div>
       </div>
 
-      {/* Card 6: Month-to-Date (MTD) Performance */}
+      {/* Card 6: This Month (Month-to-Date) */}
       <div
         className="kpi-card-v2 tone-purple"
         onClick={() => {
@@ -196,94 +230,79 @@ export function AdminKpiGrid({
         }}
         role="button"
         tabIndex={0}
-        title="Click to set filter to Month-to-Date"
+        title="Click to view entire current month"
       >
         <div className="kpi-head">
-          <span className="kpi-title">Month-to-Date (MTD)</span>
+          <span className="kpi-title">This Month's Sales (MTD)</span>
           <span className="kpi-icon-box tone-purple"><Calendar size={17} /></span>
         </div>
-        <div className="kpi-val">{peso(mtdStats.revenue)}</div>
+        <div className="kpi-val">{peso(mtdSales)}</div>
         <div className="kpi-compare-row">
           <StatusBadge
-            tone={Number(mtdStats.net_profit || 0) >= 0 ? "ok" : "bad"}
-            label={`MTD Net: ${pesoShort(mtdStats.net_profit)}`}
+            tone={mtdNet >= 0 ? "ok" : "bad"}
+            label={`Month Net: ${pesoShort(mtdNet)}`}
           />
           <span className="kpi-sub">{mtdStats.orders || 0} orders</span>
         </div>
         <div className="kpi-foot">
-          <span>Overheads MTD: <b>{peso(mtdStats.total_overheads)}</b></span>
+          <span>Month Expenses & Pay: <b>{peso(mtdOverheads)}</b></span>
           <ExternalLink size={12} />
         </div>
       </div>
 
-      {/* Card 7: Inventory Valuation & Stock Alerts */}
+      {/* Card 7: Stock on Shelf & Low-Stock Alerts */}
       <div
         className={`kpi-card-v2 ${
-          Number(counts.out_of_stock_count || 0) > 0
-            ? "tone-bad"
-            : Number(counts.low_stock_count || 0) > 0
-            ? "tone-warn"
-            : "tone-ok"
+          outCount > 0 ? "tone-bad" : lowCount > 0 ? "tone-warn" : "tone-ok"
         }`}
         onClick={() =>
           jumpToReport("products", {
-            status:
-              Number(counts.out_of_stock_count || 0) > 0
-                ? "out"
-                : Number(counts.low_stock_count || 0) > 0
-                ? "low"
-                : "all",
+            status: outCount > 0 ? "out" : lowCount > 0 ? "low" : "all",
           })
         }
         role="button"
         tabIndex={0}
-        title="Click to inspect Inventory Stock Health & Restock"
+        title="Click to check product stock levels and restock"
       >
         <div className="kpi-head">
-          <span className="kpi-title">Inventory & Stock Health</span>
+          <span className="kpi-title">Inventory Shelf Value</span>
           <span className="kpi-icon-box tone-info"><Boxes size={17} /></span>
         </div>
-        <div className="kpi-val">{peso(fin.stock_retail_value)}</div>
+        <div className="kpi-val">{peso(stockRetailVal)}</div>
         <div className="kpi-compare-row">
           <StatusBadge
-            tone={
-              Number(counts.out_of_stock_count || 0) > 0
-                ? "bad"
-                : Number(counts.low_stock_count || 0) > 0
-                ? "warn"
-                : "ok"
-            }
-            label={`${counts.out_of_stock_count || 0} Out • ${counts.low_stock_count || 0} Low • ${counts.healthy_stock_count || 0} OK`}
+            tone={outCount > 0 ? "bad" : lowCount > 0 ? "warn" : "ok"}
+            label={`${outCount} Out • ${lowCount} Low • ${okCount} Healthy`}
           />
         </div>
         <div className="kpi-foot">
-          <span>Cost Value: <b>{peso(fin.stock_cost_value)}</b> ({counts.active_products || 0} SKUs)</span>
+          <span>Supplier Cost: <b>{peso(stockCostVal)}</b> ({counts.active_products || 0} items)</span>
           <ExternalLink size={12} />
         </div>
       </div>
 
-      {/* Card 8: Void / Leakage & Active Staff */}
+      {/* Card 8: Cancelled / Voided Receipts & Staff Count */}
       <div
-        className={`kpi-card-v2 ${Number(fin.void_count || 0) > 0 ? "tone-warn" : "tone-neutral"}`}
+        className={`kpi-card-v2 ${voidCount > 0 ? "tone-warn" : "tone-neutral"}`}
         onClick={() => jumpToReport("sales", { status: "voided" })}
         role="button"
         tabIndex={0}
-        title="Click to audit Voided Receipts & Reasons"
+        title="Click to inspect cancelled/voided receipts"
       >
         <div className="kpi-head">
-          <span className="kpi-title">Void Audit & System Records</span>
+          <span className="kpi-title">Voided / Cancelled Receipts</span>
           <span className="kpi-icon-box tone-warn"><AlertTriangle size={17} /></span>
         </div>
-        <div className="kpi-val">{peso(fin.void_total)}</div>
+        <div className="kpi-val">{peso(voidTotal)}</div>
         <div className="kpi-compare-row">
           <StatusBadge
-            tone={Number(fin.void_count || 0) > 0 ? "warn" : "ok"}
-            label={`${fin.void_count || 0} voided receipts`}
+            tone={voidCount > 0 ? "warn" : "ok"}
+            label={`${voidCount} voided receipts`}
           />
-          <span className="kpi-sub">{counts.active_employees || 0} staff • {counts.total_records || 0} total DB records</span>
+          <span className="kpi-sub">{counts.active_employees || 0} active staff</span>
         </div>
         <div className="kpi-foot">
-          <span>Click to inspect voided transactions</span>
+          <span><b>{counts.total_records || 0}</b> total records in database</span>
           <ExternalLink size={12} />
         </div>
       </div>
@@ -306,18 +325,18 @@ export function AdminAlertsAndActivity({
       <div className="card">
         <div className="section-title-row">
           <h3>
-            <AlertTriangle size={16} color="var(--warn)" /> Important Alerts & Action Required
+            <AlertTriangle size={16} color="var(--warn)" /> Things That Need Your Attention
           </h3>
           <StatusBadge
             tone={(data.alerts || []).length > 0 ? "warn" : "ok"}
-            label={`${(data.alerts || []).length} active`}
+            label={`${(data.alerts || []).length} alert${(data.alerts || []).length === 1 ? "" : "s"}`}
           />
         </div>
 
         {(data.alerts || []).length === 0 ? (
           <div className="empty-compact">
             <CheckCircle2 size={20} color="var(--ok)" />
-            <span>All systems nominal. Stock levels, shift reconciliations, and margins are healthy.</span>
+            <span>Everything looks great! Stock levels, cash shifts, and profits are healthy.</span>
           </div>
         ) : (
           <div className="alerts-list">
@@ -326,8 +345,12 @@ export function AdminAlertsAndActivity({
                 key={a.id}
                 className={`alert-card-row tone-${a.severity || "info"}`}
                 onClick={() => {
-                  if (a.target === "shift") openSod();
-                  else jumpToReport(a.target || "overview", { status: a.filter || "all" });
+                  const target = a.actionTab || a.target_tab || a.target || "overview";
+                  if (target === "shifts" && a.filter === "open_sod" && openSod) {
+                    openSod();
+                  } else {
+                    jumpToReport(target, { status: a.actionFilter || a.filter || "all" });
+                  }
                 }}
                 role="button"
                 tabIndex={0}
@@ -336,11 +359,11 @@ export function AdminAlertsAndActivity({
                   <div className="alert-card-title">
                     <StatusBadge
                       tone={a.severity === "bad" ? "bad" : a.severity === "warn" ? "warn" : "info"}
-                      label={a.severity === "bad" ? "CRITICAL" : a.severity === "warn" ? "WARNING" : "NOTICE"}
+                      label={a.severity === "bad" ? "URGENT" : a.severity === "warn" ? "CHECK" : "INFO"}
                     />
                     <b>{a.title}</b>
                   </div>
-                  <p className="muted">{a.message}</p>
+                  <p className="muted">{a.message || a.description}</p>
                 </div>
                 <ExternalLink size={14} className="muted" />
               </div>
@@ -349,51 +372,54 @@ export function AdminAlertsAndActivity({
         )}
       </div>
 
-      {/* Live Recent Activity Stream */}
+      {/* Live Activity Feed */}
       <div className="card">
         <div className="section-title-row">
           <h3>
-            <Activity size={16} color="var(--info)" /> Recent System Activity
+            <Activity size={16} color="var(--info)" /> Recent Store Activity (Who Did What)
           </h3>
           <button
             type="button"
             className="link-btn"
             onClick={() => jumpToReport("audit")}
           >
-            View Full Audit Trail →
+            View All Activity <ExternalLink size={12} />
           </button>
         </div>
 
         {auditLogs.length === 0 ? (
-          <Empty text="No recent activity recorded in this period." />
+          <Empty text="No recent actions recorded in this date range." />
         ) : (
-          <div className="recent-activity-feed">
-            {auditLogs.slice(0, 5).map((log) => (
-              <div
-                key={log.id}
-                className="activity-feed-item"
-                onClick={() => onInspectAudit(log)}
-                role="button"
-                tabIndex={0}
-              >
-                <StatusBadge
-                  tone={
-                    log.action === "VOID" || log.action === "DELETE"
-                      ? "bad"
-                      : log.action === "CREATE" || log.action === "SALE" || log.action === "RESTOCK"
-                      ? "ok"
-                      : "info"
-                  }
-                  label={log.action}
-                />
-                <div className="activity-feed-text">
-                  <b>{log.summary}</b>
-                  <small className="muted">
-                    {log.timestamp} • by {log.actor} ({log.role})
-                  </small>
+          <div className="activity-feed-compact">
+            {auditLogs.slice(0, 6).map((item, idx) => {
+              const act = (item.action || "INFO").toUpperCase();
+              const tone =
+                act.includes("DELETE") || act.includes("VOID")
+                  ? "bad"
+                  : act.includes("CREATE") || act.includes("SALE") || act.includes("RESTOCK") || act.includes("BACKUP")
+                  ? "ok"
+                  : act.includes("UPDATE")
+                  ? "warn"
+                  : "info";
+              return (
+                <div
+                  key={item.uid || item.id || idx}
+                  className="activity-feed-row"
+                  onClick={() => onInspectAudit && onInspectAudit(item)}
+                  role="button"
+                  tabIndex={0}
+                  title="Click to inspect full activity details"
+                >
+                  <StatusBadge tone={tone} label={act} />
+                  <div className="activity-feed-text">
+                    <b>{item.summary}</b>
+                    <small className="muted">
+                      {item.actor || "System"} ({item.role || "admin"}) • {item.timestamp}
+                    </small>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -11,16 +11,31 @@ import { buildExportDataset, buildExcelHtml } from "./adminUtils";
 
 /**
  * Custom Controller Hook for the Admin Dashboard.
- * Encapsulates data loading, date/preset state, contextual filtering,
- * CRUD form submit handlers, bulk deletion, and CSV/Excel/Print export logic.
+ * Encapsulates data loading, normalization against the Rust SQLite schema,
+ * date/preset state, contextual filtering, CRUD form submit handlers,
+ * bulk deletion, Google Drive EOD snapshot trigger, and CSV/Excel/Print export logic.
  */
 export function useAdminController({
-  toast,
-  activeBusinessDate,
+  toast: propToast,
+  activeBusinessDate: propBusinessDate,
   currentUser,
   externalCommand,
   onClearExternalCommand,
+  refreshBranchInfo,
 }) {
+  const safeToast = useCallback(
+    (msg, type) => {
+      if (typeof propToast === "function") {
+        propToast(msg, type === "bad" ? "err" : type);
+      } else {
+        console.log(`[Toast ${type || "ok"}]:`, msg);
+      }
+    },
+    [propToast]
+  );
+
+  const activeBusinessDate = propBusinessDate || ymd();
+
   // 1. Date Range & Preset Filters
   const [preset, setPreset] = useState("this_month");
   const [from, setFrom] = useState(() => {
@@ -34,12 +49,17 @@ export function useAdminController({
   // 2. Core Data State
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncingGdrive, setSyncingGdrive] = useState(false);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
   const [salesList, setSalesList] = useState([]);
   const [productsList, setProductsList] = useState([]);
   const [employeesList, setEmployeesList] = useState([]);
-  const [commissionTypes, setCommissionTypes] = useState([]);
+  const [commissionTypes, setCommissionTypes] = useState([
+    "Sales",
+    "Bonus",
+    "Referral",
+  ]);
   const [auditLogs, setAuditLogs] = useState([]);
 
   // 3. Centralized Report Module & Filter State
@@ -78,37 +98,266 @@ export function useAdminController({
 
       try {
         const [
-          dashData,
+          rawDash,
           salesData,
           prodsData,
+          expensesData,
+          salariesData,
+          commissionsData,
+          ldCommissionsData,
           empsData,
           commTypesData,
           auditData,
         ] = await Promise.all([
-          api.dashboard(f, t),
-          api.listSales(f, t, ""),
-          api.listProducts(),
-          api.listEmployees(),
-          api.listCommissionTypes(),
-          api.listAuditLog(f, t, 300),
+          api.adminDashboard(f, t),
+          api.sales(f, t, ""),
+          api.products(),
+          api.expenses(f, t),
+          api.salaries(f, t),
+          api.commissions(f, t),
+          api.ldCommissions(f, t),
+          api.employees(),
+          api.commissionTypes(),
+          api.auditLogs(f, t, 300),
         ]);
 
-        setData(dashData);
+        const normEmployees = (empsData || []).map((emp) => ({
+          ...emp,
+          role: emp.position || emp.role || "Staff",
+          daily_rate: Number(emp.salary ?? emp.daily_rate ?? 0),
+          contact: emp.contact || `Comm: ₱${Number(emp.commission || 0)} | LD: ₱${Number(emp.ld_commission || 0)}`,
+          hired_on: (emp.created_at || emp.hired_on || "").slice(0, 10) || ymd(),
+        }));
+
+        const normExpenses = (expensesData || []).map((ex) => ({
+          ...ex,
+          incurred_on: ex.date || ex.incurred_on || ymd(),
+        }));
+
+        const normSalaries = (salariesData || []).map((sal) => ({
+          ...sal,
+          staff_name: sal.employee || sal.staff_name || "Staff",
+          role: sal.period || sal.role || "Regular Period",
+          paid_on: sal.date || sal.paid_on || ymd(),
+        }));
+
+        const normCommissions = (commissionsData || []).map((c) => ({
+          ...c,
+          staff_name: c.employee_name || c.staff_name || "Staff",
+          commission_type: c.type || c.commission_type || "Sales",
+          earned_on: c.date || c.earned_on || ymd(),
+          sales_ref: c.sales_ref || "",
+          rate_pct: Number(c.rate_pct || 0),
+          note: c.note || "",
+        }));
+
+        const normLdCommissions = (ldCommissionsData || []).map((ld) => {
+          const qty = Number(ld.quantity || 1);
+          const amt = Number(ld.amount ?? ld.total ?? 0);
+          return {
+            ...ld,
+            staff_name: ld.employee_name || ld.staff_name || "Staff",
+            customer_table: ld.customer_table || "POS / Bar",
+            drink_name: ld.drink_name || "Ladies Drink (LD)",
+            quantity: qty,
+            unit_comm: qty > 0 ? amt / qty : amt,
+            total: amt,
+            amount: amt,
+            note: ld.note || "",
+            earned_on: ld.date || ld.earned_on || ymd(),
+          };
+        });
+
+        // Count LD drinks per employee
+        const ldDrinksByStaff = {};
+        normLdCommissions.forEach((ld) => {
+          const k = (ld.staff_name || "").toLowerCase();
+          ldDrinksByStaff[k] = (ldDrinksByStaff[k] || 0) + Number(ld.quantity || 0);
+        });
+
+        const empRoleByName = {};
+        normEmployees.forEach((e) => {
+          empRoleByName[(e.name || "").toLowerCase()] = e.role || "Staff";
+        });
+
+        const normEmpPerf = (rawDash?.top_employees || []).map((ep) => {
+          const sName = ep.employee_name || ep.staff_name || "Staff";
+          const k = sName.toLowerCase();
+          return {
+            ...ep,
+            staff_name: sName,
+            role: empRoleByName[k] || "Staff",
+            salary_total: Number(ep.salary ?? ep.salary_total ?? 0),
+            commission_total: Number(ep.commission ?? ep.commission_total ?? 0),
+            ld_total: Number(ep.ld_commission ?? ep.ld_total ?? 0),
+            ld_drinks: ldDrinksByStaff[k] || 0,
+            total_payout: Number(ep.total ?? ep.total_payout ?? 0),
+          };
+        });
+
+        const normDaily = (rawDash?.daily || []).map((d) => {
+          const salesVal = Number(d.sales ?? d.total ?? 0);
+          const cogsVal = Number(d.cogs || 0);
+          const gpVal = Number(d.gross_profit ?? salesVal - cogsVal);
+          const expVal = Number(d.expenses || 0);
+          const salVal = Number(d.salaries || 0);
+          const comVal = Number(d.commissions || 0);
+          const ldVal = Number(d.ld_commissions || 0);
+          const netVal = Number(
+            d.net_after_cogs ?? d.net ?? gpVal - expVal - salVal - comVal - ldVal
+          );
+          return {
+            ...d,
+            date: d.day || d.date,
+            total: salesVal,
+            sales: salesVal,
+            cogs: cogsVal,
+            gross_profit: gpVal,
+            expenses: expVal,
+            salaries: salVal,
+            commissions: comVal,
+            ld_commissions: ldVal,
+            net: netVal,
+            count: Number(d.count || 0),
+          };
+        });
+
+        const normPrevDaily = (rawDash?.previous_period?.daily || []).map((d) => ({
+          ...d,
+          date: d.day || d.date,
+          total: Number(d.sales ?? d.total ?? 0),
+        }));
+
+        const normShifts = (rawDash?.shift_history || []).map((s) => ({
+          ...s,
+          variance:
+            s.status === "closed"
+              ? Number(s.closing_cash || 0) - Number(s.expected_cash || 0)
+              : 0,
+        }));
+
+        const normAlerts = (rawDash?.alerts || []).map((a) => ({
+          ...a,
+          message: a.description || a.message || "",
+          actionTab: a.target_tab || a.actionTab || "overview",
+          actionFilter:
+            a.filter === "low_stock"
+              ? "low"
+              : a.filter === "out_of_stock"
+              ? "out"
+              : a.filter,
+        }));
+
+        const normalizedDashboard = {
+          ...rawDash,
+          financials: {
+            revenue: Number(rawDash?.revenue || 0),
+            gross_sales: Number(rawDash?.revenue || 0),
+            orders: Number(rawDash?.orders || 0),
+            completed_orders: Number(rawDash?.orders || 0),
+            avg_ticket: Number(rawDash?.avg_ticket || 0),
+            cogs: Number(rawDash?.cogs || 0),
+            gross_profit: Number(rawDash?.gross_profit || 0),
+            gross_margin: Number(rawDash?.gross_margin || 0),
+            gross_margin_pct: Number(rawDash?.gross_margin || 0),
+            expenses: Number(rawDash?.expenses || 0),
+            expenses_total: Number(rawDash?.expenses || 0),
+            salaries: Number(rawDash?.salaries || 0),
+            salaries_total: Number(rawDash?.salaries || 0),
+            commissions: Number(rawDash?.commissions || 0),
+            commissions_total: Number(rawDash?.commissions || 0),
+            ld_commissions: Number(rawDash?.ld_commissions || 0),
+            ld_commissions_total: Number(rawDash?.ld_commissions || 0),
+            total_overheads: Number(rawDash?.total_overheads || 0),
+            net_profit: Number(rawDash?.net_profit || 0),
+            net_margin: Number(rawDash?.net_margin || 0),
+            net_margin_pct: Number(rawDash?.net_margin || 0),
+            void_total: Number(rawDash?.voided_total || 0),
+            voided_total: Number(rawDash?.voided_total || 0),
+            void_count: Number(rawDash?.voided_count || 0),
+            voided_count: Number(rawDash?.voided_count || 0),
+            void_rate_pct: Number(rawDash?.void_rate || 0),
+            stock_cost_value: Number(rawDash?.inventory_cost || 0),
+            inventory_cost_value: Number(rawDash?.inventory_cost || 0),
+            stock_retail_value: Number(rawDash?.inventory_retail || 0),
+            inventory_retail_value: Number(rawDash?.inventory_retail || 0),
+          },
+          previous: {
+            gross_sales: Number(rawDash?.previous_period?.revenue || 0),
+            completed_orders: Number(rawDash?.previous_period?.orders || 0),
+            cogs: Number(rawDash?.previous_period?.cogs || 0),
+            gross_profit: Number(rawDash?.previous_period?.gross_profit || 0),
+            total_overheads: Number(rawDash?.previous_period?.total_overheads || 0),
+            net_profit: Number(rawDash?.previous_period?.net_profit || 0),
+            voided_total: Number(rawDash?.previous_period?.voided_total || 0),
+            daily: normPrevDaily,
+          },
+          today: {
+            date: rawDash?.today?.date || activeBusinessDate,
+            sales: Number(rawDash?.today?.revenue || 0),
+            orders: Number(rawDash?.today?.orders || 0),
+            records_created: Number(rawDash?.today?.records_created || 0),
+            net_profit: Number(rawDash?.today?.net_profit || 0),
+          },
+          mtd: {
+            from: rawDash?.mtd?.from || f,
+            to: rawDash?.mtd?.to || t,
+            sales: Number(rawDash?.mtd?.revenue || 0),
+            orders: Number(rawDash?.mtd?.orders || 0),
+            gross_profit: Number(rawDash?.mtd?.gross_profit || 0),
+            overheads: Number(rawDash?.mtd?.total_overheads || 0),
+            net_profit: Number(rawDash?.mtd?.net_profit || 0),
+          },
+          counts: {
+            ...(rawDash?.counts || {}),
+            low_stock: Number(rawDash?.counts?.products_low_stock || 0),
+            out_of_stock: Number(rawDash?.counts?.products_out_of_stock || 0),
+            healthy_stock: Number(rawDash?.counts?.products_healthy || 0),
+            active_products: Number(rawDash?.counts?.products_active || 0),
+            active_employees: Number(rawDash?.counts?.employees_active || 0),
+            expenses_count: Number(rawDash?.counts?.expenses_count || normExpenses.length),
+            salaries_count: Number(rawDash?.counts?.salaries_count || normSalaries.length),
+            commissions_count: Number(rawDash?.counts?.commissions_count || normCommissions.length),
+            ld_commissions_count: Number(rawDash?.counts?.ld_commissions_count || normLdCommissions.length),
+          },
+          daily: normDaily,
+          by_category: rawDash?.categories || [],
+          expenses_by_category: rawDash?.expense_categories || [],
+          top_products: (rawDash?.product_performance || []).map((p) => ({
+            ...p,
+            total: Number(p.revenue ?? p.total ?? 0),
+            qty: Number(p.qty || 0),
+            profit: Number(p.profit || 0),
+          })),
+          catalog_performance: rawDash?.catalog_performance || [],
+          employee_performance: normEmpPerf,
+          expenses_list: normExpenses,
+          salaries_list: normSalaries,
+          commissions_list: normCommissions,
+          ld_commissions_list: normLdCommissions,
+          shifts: normShifts,
+          alerts: normAlerts,
+        };
+
+        setData(normalizedDashboard);
         setSalesList(salesData || []);
         setProductsList(prodsData || []);
-        setEmployeesList(empsData || []);
-        setCommissionTypes(commTypesData || []);
+        setEmployeesList(normEmployees);
+        const normCommTypes = (commTypesData || [])
+          .map((ct) => (typeof ct === "string" ? ct : ct?.name))
+          .filter(Boolean);
+        setCommissionTypes(normCommTypes.length ? normCommTypes : ["Sales", "Bonus", "Referral"]);
         setAuditLogs(auditData || []);
       } catch (err) {
         const msg = errText(err);
         setError(msg);
-        toast(`Failed to load analytics: ${msg}`, "bad");
+        safeToast(`Failed to load analytics: ${msg}`, "bad");
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [from, to, toast]
+    [from, to, activeBusinessDate, safeToast]
   );
 
   useEffect(() => {
@@ -125,8 +374,10 @@ export function useAdminController({
     if (externalCommand.search !== undefined) setSearch(externalCommand.search);
     if (externalCommand.category !== undefined) setCategoryFilter(externalCommand.category);
     if (externalCommand.status !== undefined) setStatusFilter(externalCommand.status);
+    if (externalCommand.statusFilter !== undefined) setStatusFilter(externalCommand.statusFilter);
 
-    if (externalCommand.action === "new_product") {
+    const openAction = externalCommand.action || externalCommand.openModal;
+    if (openAction === "new_product" || openAction === "add-product") {
       setReportTab("products");
       setEditingProduct({
         name: "",
@@ -138,7 +389,7 @@ export function useAdminController({
         image: "",
         variants: [],
       });
-    } else if (externalCommand.action === "new_expense") {
+    } else if (openAction === "new_expense" || openAction === "add-expense") {
       setReportTab("expenses");
       setEditingExpense({
         category: "Supplies",
@@ -146,7 +397,7 @@ export function useAdminController({
         amount: "",
         incurred_on: activeBusinessDate || ymd(),
       });
-    } else if (externalCommand.action === "new_salary") {
+    } else if (openAction === "new_salary" || openAction === "add-salary") {
       setReportTab("salaries");
       setEditingSalary({
         staff_name: "",
@@ -155,18 +406,18 @@ export function useAdminController({
         note: "",
         paid_on: activeBusinessDate || ymd(),
       });
-    } else if (externalCommand.action === "new_commission") {
+    } else if (openAction === "new_commission" || openAction === "add-commission") {
       setReportTab("commissions");
       setEditingCommission({
         staff_name: "",
-        commission_type: commissionTypes[0] || "Sales Bonus",
+        commission_type: commissionTypes[0] || "Sales",
         amount: "",
         sales_ref: "",
         rate_pct: 0,
         note: "",
         earned_on: activeBusinessDate || ymd(),
       });
-    } else if (externalCommand.action === "new_ld") {
+    } else if (openAction === "new_ld" || openAction === "add-ld") {
       setReportTab("ld-commissions");
       setEditingLdCommission({
         staff_name: "",
@@ -207,7 +458,7 @@ export function useAdminController({
     }
     if (e && e.preventDefault) e.preventDefault();
     if (draftFrom > draftTo) {
-      toast("Start date cannot be after end date.", "warn");
+      safeToast("Start date cannot be after end date.", "warn");
       return;
     }
     setFrom(draftFrom);
@@ -241,6 +492,24 @@ export function useAdminController({
         reportSectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }, 60);
+  };
+
+  const handleSyncGdriveNow = async () => {
+    setSyncingGdrive(true);
+    try {
+      const res = await api.syncToGdrive();
+      if (refreshBranchInfo) await refreshBranchInfo();
+      safeToast(
+        res?.is_google_drive
+          ? `☁️ Atomic snapshot saved to Google Drive (${res.archive_path})`
+          : `📁 Atomic snapshot saved to local EOD_Backups (${res?.archive_path || ""})`
+      );
+      loadAll(from, to, true);
+    } catch (err) {
+      safeToast(errText(err), "bad");
+    } finally {
+      setSyncingGdrive(false);
+    }
   };
 
   const allProductCategories = useMemo(() => {
@@ -386,7 +655,9 @@ export function useAdminController({
 
   const filteredEmployees = useMemo(() => {
     const perfMap = new Map();
-    (data?.employee_performance || []).forEach((ep) => perfMap.set(ep.staff_name.toLowerCase(), ep));
+    (data?.employee_performance || []).forEach((ep) =>
+      perfMap.set((ep.staff_name || "").toLowerCase(), ep)
+    );
 
     return employeesList
       .map((emp) => {
@@ -457,11 +728,11 @@ export function useAdminController({
     });
   }, [auditLogs, statusFilter, qLower]);
 
-  // CRUD Submit Handlers
+  // CRUD Submit Handlers (mapped to exact SQLite column names in cmds.rs)
   const handleSaveProduct = async (e) => {
     e.preventDefault();
-    if (!editingProduct.name?.trim()) return toast("Product name is required", "bad");
-    if (Number(editingProduct.price) < 0) return toast("Price cannot be negative", "bad");
+    if (!editingProduct.name?.trim()) return safeToast("Product name is required", "bad");
+    if (Number(editingProduct.price) < 0) return safeToast("Price cannot be negative", "bad");
     try {
       await api.saveProduct({
         ...editingProduct,
@@ -473,13 +744,17 @@ export function useAdminController({
         low_stock: Number(editingProduct.low_stock) || 0,
         variants: (editingProduct.variants || [])
           .filter((v) => v.name && v.name.trim())
-          .map((v) => ({ name: v.name.trim(), price: Number(v.price) || 0 })),
+          .map((v) => ({
+            name: v.name.trim(),
+            qty: Number(v.qty || 1),
+            price: Number(v.price) || 0,
+          })),
       });
-      toast(editingProduct.id ? "Product updated" : "Product added to catalog");
+      safeToast(editingProduct.id ? "Product updated" : "Product added to catalog");
       setEditingProduct(null);
       loadAll(from, to, true);
     } catch (err) {
-      toast(errText(err), "bad");
+      safeToast(errText(err), "bad");
     }
   };
 
@@ -487,7 +762,7 @@ export function useAdminController({
     e.preventDefault();
     if (!restockModal?.product) return;
     const qty = Number(restockModal.qty || 0);
-    if (qty <= 0) return toast("Restock quantity must be greater than 0", "bad");
+    if (qty <= 0) return safeToast("Restock quantity must be greater than 0", "bad");
     try {
       await api.restock(
         restockModal.product.id,
@@ -495,139 +770,144 @@ export function useAdminController({
         Number(restockModal.unitCost || 0),
         restockModal.note || ""
       );
-      toast(`Restocked +${qty} ${restockModal.product.name}`);
+      safeToast(`Restocked +${qty} ${restockModal.product.name}`);
       setRestockModal(null);
       loadAll(from, to, true);
     } catch (err) {
-      toast(errText(err), "bad");
+      safeToast(errText(err), "bad");
     }
   };
 
   const handleSaveExpense = async (e) => {
     e.preventDefault();
     const amt = Number(editingExpense?.amount || 0);
-    if (amt <= 0) return toast("Expense amount must be greater than zero", "bad");
+    if (amt <= 0) return safeToast("Expense amount must be greater than zero", "bad");
+    const dateVal = editingExpense.incurred_on || editingExpense.date || activeBusinessDate || ymd();
     try {
       await api.saveExpense({
-        ...editingExpense,
+        id: editingExpense.id,
         amount: amt,
-        category: editingExpense.category || "Other",
+        category: editingExpense.category || "General",
         description: editingExpense.description || "",
-        incurred_on: editingExpense.incurred_on || activeBusinessDate || ymd(),
+        date: dateVal,
+        incurred_on: dateVal,
       });
-      toast(editingExpense.id ? "Expense updated" : "Expense recorded");
+      safeToast(editingExpense.id ? "Expense updated" : "Expense recorded");
       setEditingExpense(null);
       loadAll(from, to, true);
     } catch (err) {
-      toast(errText(err), "bad");
+      safeToast(errText(err), "bad");
     }
   };
 
   const handleSaveSalary = async (e) => {
     e.preventDefault();
-    if (!editingSalary?.staff_name?.trim()) return toast("Staff name is required", "bad");
+    const empName = (editingSalary?.staff_name || editingSalary?.employee || "").trim();
+    if (!empName) return safeToast("Staff name is required", "bad");
     const amt = Number(editingSalary?.amount || 0);
-    if (amt <= 0) return toast("Salary amount must be greater than zero", "bad");
+    if (amt <= 0) return safeToast("Salary amount must be greater than zero", "bad");
+    const dateVal = editingSalary.paid_on || editingSalary.date || activeBusinessDate || ymd();
     try {
       await api.saveSalary({
-        ...editingSalary,
-        staff_name: editingSalary.staff_name.trim(),
-        role: editingSalary.role || "",
+        id: editingSalary.id,
+        employee: empName,
+        staff_name: empName,
+        period: editingSalary.role || editingSalary.period || "",
         amount: amt,
         note: editingSalary.note || "",
-        paid_on: editingSalary.paid_on || activeBusinessDate || ymd(),
+        date: dateVal,
       });
-      toast(editingSalary.id ? "Salary record updated" : "Salary payment recorded");
+      safeToast(editingSalary.id ? "Salary record updated" : "Salary payment recorded");
       setEditingSalary(null);
       loadAll(from, to, true);
     } catch (err) {
-      toast(errText(err), "bad");
+      safeToast(errText(err), "bad");
     }
   };
 
   const handleSaveCommission = async (e) => {
     e.preventDefault();
-    if (!editingCommission?.staff_name?.trim()) return toast("Staff name is required", "bad");
+    const empName = (editingCommission?.staff_name || editingCommission?.employee_name || "").trim();
+    if (!empName) return safeToast("Staff name is required", "bad");
     const amt = Number(editingCommission?.amount || 0);
-    if (amt <= 0) return toast("Commission amount must be greater than zero", "bad");
+    if (amt <= 0) return safeToast("Commission amount must be greater than zero", "bad");
+    const dateVal = editingCommission.earned_on || editingCommission.date || activeBusinessDate || ymd();
     try {
       await api.saveCommission({
-        ...editingCommission,
-        staff_name: editingCommission.staff_name.trim(),
-        commission_type: editingCommission.commission_type || "Sales Bonus",
+        id: editingCommission.id,
+        employee_name: empName,
+        staff_name: empName,
+        type: editingCommission.commission_type || editingCommission.type || "Sales",
         amount: amt,
-        sales_ref: editingCommission.sales_ref || "",
-        rate_pct: Number(editingCommission.rate_pct || 0),
-        note: editingCommission.note || "",
-        earned_on: editingCommission.earned_on || activeBusinessDate || ymd(),
+        date: dateVal,
       });
-      toast(editingCommission.id ? "Commission updated" : "Commission recorded");
+      safeToast(editingCommission.id ? "Commission updated" : "Commission recorded");
       setEditingCommission(null);
       loadAll(from, to, true);
     } catch (err) {
-      toast(errText(err), "bad");
+      safeToast(errText(err), "bad");
     }
   };
 
   const handleSaveLdCommission = async (e) => {
     e.preventDefault();
-    if (!editingLdCommission?.staff_name?.trim()) return toast("Staff name is required", "bad");
+    const empName = (editingLdCommission?.staff_name || editingLdCommission?.employee_name || "").trim();
+    if (!empName) return safeToast("Staff name is required", "bad");
     const qty = Number(editingLdCommission?.quantity || 0);
     const unit = Number(editingLdCommission?.unit_comm || 0);
     if (qty <= 0 || unit <= 0)
-      return toast("Quantity and rate per drink must be greater than zero", "bad");
+      return safeToast("Quantity and rate per drink must be greater than zero", "bad");
+    const dateVal = editingLdCommission.earned_on || editingLdCommission.date || activeBusinessDate || ymd();
     try {
       await api.saveLdCommission({
-        ...editingLdCommission,
-        staff_name: editingLdCommission.staff_name.trim(),
-        customer_table: editingLdCommission.customer_table || "",
-        drink_name: editingLdCommission.drink_name || "Ladies Drink",
+        id: editingLdCommission.id,
+        employee_name: empName,
+        staff_name: empName,
         quantity: qty,
-        unit_comm: unit,
+        amount: qty * unit,
         total: qty * unit,
-        note: editingLdCommission.note || "",
-        earned_on: editingLdCommission.earned_on || activeBusinessDate || ymd(),
+        date: dateVal,
       });
-      toast(editingLdCommission.id ? "LD Commission updated" : "LD Commission recorded");
+      safeToast(editingLdCommission.id ? "LD Commission updated" : "LD Commission recorded");
       setEditingLdCommission(null);
       loadAll(from, to, true);
     } catch (err) {
-      toast(errText(err), "bad");
+      safeToast(errText(err), "bad");
     }
   };
 
   const handleSaveEmployee = async (e) => {
     e.preventDefault();
-    if (!editingEmployee?.name?.trim()) return toast("Employee full name is required", "bad");
+    if (!editingEmployee?.name?.trim()) return safeToast("Employee full name is required", "bad");
     try {
       await api.saveEmployee({
-        ...editingEmployee,
+        id: editingEmployee.id,
         name: editingEmployee.name.trim(),
-        role: (editingEmployee.role || "").trim(),
-        contact: (editingEmployee.contact || "").trim(),
-        daily_rate: Number(editingEmployee.daily_rate || 0),
-        hired_on: editingEmployee.hired_on || ymd(),
+        position: (editingEmployee.role || editingEmployee.position || "").trim(),
+        salary: Number(editingEmployee.daily_rate ?? editingEmployee.salary ?? 0),
+        commission: Number(editingEmployee.commission || 0),
+        ld_commission: Number(editingEmployee.ld_commission || 50),
       });
-      toast(editingEmployee.id ? "Employee profile updated" : "New employee added");
+      safeToast(editingEmployee.id ? "Employee profile updated" : "New employee added");
       setEditingEmployee(null);
       loadAll(from, to, true);
     } catch (err) {
-      toast(errText(err), "bad");
+      safeToast(errText(err), "bad");
     }
   };
 
   const handleVoidSaleSubmit = async (e) => {
     e.preventDefault();
     if (!voidingSale) return;
-    if (!voidReason.trim()) return toast("Please enter a reason for voiding this receipt", "bad");
+    if (!voidReason.trim()) return safeToast("Please enter a reason for voiding this receipt", "bad");
     try {
       await api.voidSale(voidingSale.id, voidReason.trim(), currentUser?.name || "Admin");
-      toast(`Receipt ${voidingSale.receipt_no} voided & stock restored`);
+      safeToast(`Receipt ${voidingSale.receipt_no} voided & stock restored`);
       setVoidingSale(null);
       setVoidReason("");
       loadAll(from, to, true);
     } catch (err) {
-      toast(errText(err), "bad");
+      safeToast(errText(err), "bad");
     }
   };
 
@@ -636,11 +916,11 @@ export function useAdminController({
     if (!viewingShift) return;
     try {
       await api.updateShiftNotes(viewingShift.id, shiftNotesDraft);
-      toast("Shift audit notes saved");
+      safeToast("Shift audit notes saved");
       setViewingShift((s) => (s ? { ...s, notes: shiftNotesDraft } : null));
       loadAll(from, to, true);
     } catch (err) {
-      toast(errText(err), "bad");
+      safeToast(errText(err), "bad");
     }
   };
 
@@ -672,12 +952,12 @@ export function useAdminController({
             else if (reportTab === "ld-commissions") await api.deleteLdCommission(id);
             else if (reportTab === "employees") await api.deleteEmployee(id);
           }
-          toast(`Processed ${selectedIds.length} records`);
+          safeToast(`Processed ${selectedIds.length} records`);
           setSelectedIds([]);
           setConfirmAction(null);
           loadAll(from, to, true);
         } catch (err) {
-          toast(errText(err), "bad");
+          safeToast(errText(err), "bad");
         }
       },
     });
@@ -706,7 +986,7 @@ export function useAdminController({
       ...ds.rows.map((r) => r.map(esc).join(",")),
     ];
     downloadBlob(`${ds.title}_${from}_to_${to}.csv`, lines.join("\n"), "text/csv;charset=utf-8");
-    toast(`Exported ${ds.rows.length} rows to CSV`);
+    safeToast(`Exported ${ds.rows.length} rows to CSV`);
   };
 
   const handleExportExcel = () => {
@@ -721,7 +1001,7 @@ export function useAdminController({
       search,
     });
     downloadBlob(`${ds.title}_${from}_to_${to}.xls`, html, "application/vnd.ms-excel");
-    toast(`Exported ${ds.rows.length} rows to Excel (.xls)`);
+    safeToast(`Exported ${ds.rows.length} rows to Excel (.xls)`);
   };
 
   const handlePrintReport = () => {
@@ -751,6 +1031,7 @@ export function useAdminController({
     });
 
   return {
+    toast: safeToast,
     preset,
     from,
     to,
@@ -760,6 +1041,7 @@ export function useAdminController({
     setDraftTo,
     loading,
     refreshing,
+    syncingGdrive,
     error,
     data,
     employeesList,
@@ -816,6 +1098,7 @@ export function useAdminController({
     handleApplyDateRange,
     handleResetAllFilters,
     jumpToReport,
+    handleSyncGdriveNow,
     allProductCategories,
     allStaffNames,
     filteredSales,

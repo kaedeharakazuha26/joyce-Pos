@@ -30,21 +30,21 @@
     "semantic_hash": ""
   },
   "src-tauri/src/cmds.rs": {
-    "mtime": 1792230157.9231684,
-    "seen": 1792231368.47822,
-    "ast_hash": "c06646609b7c1b8f1cdb0cc331f62220",
+    "mtime": 1792272190.2628777,
+    "seen": 1792272737.9652045,
+    "ast_hash": "0e15634dc0901c863e27ef1e04267a07",
     "semantic_hash": ""
   },
   "src-tauri/src/db.rs": {
-    "mtime": 1792229737.549862,
-    "seen": 1792231368.4782224,
-    "ast_hash": "8c3f996d6ef649f31cc0018809e8ca8a",
+    "mtime": 1792272097.8072183,
+    "seen": 1792272737.9652095,
+    "ast_hash": "bc018fe90c53a6d19e14b5e1850ab3ae",
     "semantic_hash": ""
   },
   "src-tauri/src/lib.rs": {
-    "mtime": 1792230234.2647688,
-    "seen": 1792231368.478224,
-    "ast_hash": "f3c7444b878f5fe04e67aa6fc59c6de2",
+    "mtime": 1792272191.6048872,
+    "seen": 1792272737.9652135,
+    "ast_hash": "34fe36c65852a8fe1912a6805f7bc7fd",
     "semantic_hash": ""
   },
   "src-tauri/src/main.rs": {
@@ -66,15 +66,15 @@
     "semantic_hash": ""
   },
   "src/App.jsx": {
-    "mtime": 1792230529.0130873,
-    "seen": 1792231368.4782307,
-    "ast_hash": "52d123d773ca5514a7936331145cbb43",
+    "mtime": 1792272243.3492563,
+    "seen": 1792272737.9652307,
+    "ast_hash": "48972857b2ed5fffae0125763bfdbee8",
     "semantic_hash": ""
   },
   "src/api.js": {
-    "mtime": 1792230239.3768091,
-    "seen": 1792231368.4782324,
-    "ast_hash": "5d986132b47d04dd1eb82d70b2ee054e",
+    "mtime": 1792272210.5590224,
+    "seen": 1792272737.9652348,
+    "ast_hash": "4ecc1da22a27c67a16ed23dc6b8fe818",
     "semantic_hash": ""
   },
   "src/components/ui.jsx": {
@@ -126,9 +126,9 @@
     "semantic_hash": ""
   },
   "src/pages/Settings.jsx": {
-    "mtime": 1792180032.6853306,
-    "seen": 1792180494.3904467,
-    "ast_hash": "0143fcdd349b0bb2901e12282a4635f7",
+    "mtime": 1792272333.0428963,
+    "seen": 1792272737.9653275,
+    "ast_hash": "2053a18006feaa3944a295f705eeb478",
     "semantic_hash": ""
   },
   "src/pages/Transactions.jsx": {
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "src/pages/AdminDashboard.jsx": {
-    "mtime": 1792233684.3271303,
-    "seen": 1792233715.1261075,
-    "ast_hash": "fe181f47034a0244f78587b74876a1a6",
+    "mtime": 1792272673.7513232,
+    "seen": 1792272737.9652872,
+    "ast_hash": "87fdd0e8668dc91dee01a234f3ac164a",
     "semantic_hash": ""
   },
   "src/components/admin/AdminCharts.jsx": {
@@ -300,9 +300,9 @@
     "semantic_hash": ""
   },
   "src/components/admin/AdminKpiGrid.jsx": {
-    "mtime": 1792232817.2704191,
-    "seen": 1792233715.1260705,
-    "ast_hash": "e9ba6744848c5ba2fb3d9029d120e57d",
+    "mtime": 1792272540.6873772,
+    "seen": 1792272737.9652476,
+    "ast_hash": "8c8c514e3fcbbfdfac12e51a9aa2430b",
     "semantic_hash": ""
   },
   "src/components/admin/AdminModals.jsx": {
@@ -342,9 +342,9 @@
     "semantic_hash": ""
   },
   "src/components/admin/useAdminController.js": {
-    "mtime": 1792233608.1045403,
-    "seen": 1792233715.1260946,
-    "ast_hash": "071569f97e2eec17ae0dde155af2a487",
+    "mtime": 1792272672.6683156,
+    "seen": 1792272737.9652765,
+    "ast_hash": "7eb0c1584b8747196ff0de568035b98a",
     "semantic_hash": ""
   }
 }

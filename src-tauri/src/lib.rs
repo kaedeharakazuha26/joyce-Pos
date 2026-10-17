@@ -71,6 +71,7 @@ pub fn run() {
             cmds::create_branch,
             cmds::delete_branch,
             cmds::set_storage_dir,
+            cmds::sync_to_gdrive,
             cmds::list_audit_logs,
             cmds::global_search,
             cmds::update_shift_notes,

@@ -60,7 +60,18 @@ export const api = {
   createBranch: (name) => call("create_branch", { name }),
   deleteBranch: (branchId) => call("delete_branch", { branchId }),
   setStorageDir: (storageDir) => call("set_storage_dir", { storageDir }),
+  syncToGdrive: () => call("sync_to_gdrive"),
   auditLogs: (from, to, limit = 250) => call("list_audit_logs", { from, to, limit }),
+  listAuditLog: (from, to, limit = 250) => call("list_audit_logs", { from, to, limit }),
+  listProducts: () => call("list_products"),
+  listSales: (from, to, status = "") => call("list_sales", { from, to, status }),
+  listExpenses: (from, to) => call("list_expenses", { from, to }),
+  listSalaries: (from, to) => call("list_salaries", { from, to }),
+  listCommissions: (from, to) => call("list_commissions", { from, to }),
+  listCommissionTypes: () => call("list_commission_types"),
+  listLdCommissions: (from, to) => call("list_ld_commissions", { from, to }),
+  listEmployees: () => call("list_employees"),
   globalSearch: (query) => call("global_search", { query }),
   updateShiftNotes: (id, notes) => call("update_shift_notes", { id, notes }),
 };
+

@@ -1878,6 +1878,14 @@ pub fn end_day(db: State<Db>, closing_cash: f64, closed_by: String, notes: Strin
         }),
     );
 
+    // Automatically run atomic End-of-Day (EOD) snapshot backup to Google Drive folder (if configured) or local EOD_Backups
+    let eod_backup = perform_eod_snapshot(&db, &c, &format!("EOD_{}", biz_date), &closed_by).unwrap_or_else(|err| {
+        json!({
+            "ok": false,
+            "error": err
+        })
+    });
+
     Ok(json!({
         "id": shift_id,
         "business_date": biz_date,
@@ -1892,7 +1900,8 @@ pub fn end_day(db: State<Db>, closing_cash: f64, closed_by: String, notes: Strin
         "closing_cash": r2(closing_cash),
         "variance": variance,
         "closed_at": closed_at,
-        "closed_by": closed_by
+        "closed_by": closed_by,
+        "eod_backup": eod_backup
     }))
 }
 
@@ -2251,7 +2260,91 @@ pub fn delete_cashier(db: State<Db>, id: i64) -> R<()> {
     Ok(())
 }
 
-// ───────────────────────── Branches & Multi-Location ─────────────────────────
+// ───────────────────────── Branches & Safe EOD Google Drive Sync ─────────────────────────
+
+/// Atomically writes a clean, single-file SQLite snapshot (`VACUUM INTO`) without WAL/SHM locks.
+/// Writes to a `.tmp` file first and renames atomically so Google Drive never syncs a partial file.
+pub fn perform_eod_snapshot(db: &Db, c: &Connection, tag: &str, actor: &str) -> R<Value> {
+    let (branch, cloud_dir, default_dir) = {
+        let bs = db.1.lock().map_err(e)?;
+        (bs.active_branch_info(), bs.backup_base_dir(), bs.default_dir.clone())
+    };
+
+    let target_base = cloud_dir.clone().unwrap_or_else(|| default_dir.clone());
+    let is_gdrive = cloud_dir.is_some();
+    let eod_dir = target_base.join("EOD_Backups");
+    std::fs::create_dir_all(&eod_dir).map_err(|err| format!("Failed to create EOD_Backups folder: {}", err))?;
+
+    let safe_tag: String = tag
+        .chars()
+        .map(|ch| if ch.is_alphanumeric() || ch == '-' || ch == '_' { ch } else { '_' })
+        .collect();
+    let archive_filename = format!("joyce_pos_{}_{}.db", branch.id, safe_tag);
+    let archive_path = eod_dir.join(&archive_filename);
+    let tmp_archive_path = eod_dir.join(format!(".tmp_{}", archive_filename));
+
+    let _ = std::fs::remove_file(&tmp_archive_path);
+    let tmp_str = tmp_archive_path.to_string_lossy().to_string();
+    c.execute("VACUUM INTO ?1", [&tmp_str]).map_err(e)?;
+    let _ = std::fs::remove_file(&archive_path);
+    std::fs::rename(&tmp_archive_path, &archive_path).map_err(e)?;
+
+    // If a Google Drive / Cloud folder is configured, also update the root branch snapshot file
+    // (e.g. `<Google Drive>/joyce_pos.db`) atomically so the office PC always sees the latest EOD state.
+    let mut latest_cloud_path_str = archive_path.to_string_lossy().to_string();
+    if let Some(ref gdir) = cloud_dir {
+        let latest_path = gdir.join(&branch.file);
+        let _ = std::fs::copy(&archive_path, &latest_path);
+        latest_cloud_path_str = latest_path.to_string_lossy().to_string();
+    }
+
+    let ts = now();
+    {
+        let mut bs = db.1.lock().map_err(e)?;
+        bs.config.last_backup_at = ts.clone();
+        bs.config.last_backup_path = archive_path.to_string_lossy().to_string();
+        let _ = bs.save();
+    }
+
+    log_audit(
+        c,
+        actor,
+        "admin",
+        "EOD_BACKUP",
+        "database",
+        &branch.id,
+        &format!(
+            "Saved atomic {} snapshot for '{}' to {}",
+            if is_gdrive { "Google Drive EOD" } else { "Local EOD" },
+            branch.name,
+            archive_path.to_string_lossy()
+        ),
+        json!({
+            "branch": branch.name,
+            "is_google_drive": is_gdrive,
+            "archive_path": archive_path.to_string_lossy(),
+            "latest_path": latest_cloud_path_str,
+            "timestamp": ts
+        }),
+    );
+
+    Ok(json!({
+        "ok": true,
+        "is_google_drive": is_gdrive,
+        "branch_name": branch.name,
+        "archive_path": archive_path.to_string_lossy(),
+        "latest_path": latest_cloud_path_str,
+        "timestamp": ts
+    }))
+}
+
+#[tauri::command]
+pub fn sync_to_gdrive(db: State<Db>) -> R<Value> {
+    let c = db.0.lock().map_err(e)?;
+    let bdate = active_business_date(&c);
+    let stamp = chrono::Local::now().format("%H%M%S").to_string();
+    perform_eod_snapshot(&db, &c, &format!("SYNC_{}_{}", bdate, stamp), "Administrator")
+}
 
 fn branch_info_json(db: &Db) -> R<Value> {
     let bs = db.1.lock().map_err(e)?;
@@ -2261,6 +2354,8 @@ fn branch_info_json(db: &Db) -> R<Value> {
         "storage_dir": bs.config.storage_dir,
         "default_dir": bs.default_dir.to_string_lossy(),
         "active_db_path": active_path.to_string_lossy(),
+        "last_backup_at": bs.config.last_backup_at,
+        "last_backup_path": bs.config.last_backup_path,
         "branches": bs.config.branches,
     }))
 }
@@ -2308,7 +2403,7 @@ pub fn create_branch(db: State<Db>, name: String) -> R<Value> {
         let timestamp = chrono::Local::now().format("%s").to_string();
         let branch_id = format!("branch_{}_{}", safe_name.trim_matches('_'), &timestamp[timestamp.len().saturating_sub(4)..]);
         let file = format!("joyce_pos_{}.db", branch_id);
-        let path = bs.active_base_dir().join(&file);
+        let path = bs.default_dir.join(&file);
 
         let info = crate::db::BranchInfo {
             id: branch_id.clone(),
@@ -2383,7 +2478,7 @@ pub fn set_storage_dir(db: State<Db>, storage_dir: String) -> R<Value> {
 
     let active_path = {
         let mut bs = db.1.lock().map_err(e)?;
-        bs.config.storage_dir = storage_dir;
+        bs.config.storage_dir = storage_dir.clone();
         bs.save().map_err(e)?;
         bs.active_db_path()
     };
@@ -2392,9 +2487,15 @@ pub fn set_storage_dir(db: State<Db>, storage_dir: String) -> R<Value> {
         let mut c = db.0.lock().map_err(e)?;
         *c = Connection::open(&active_path).map_err(e)?;
         crate::db::init(&c).map_err(e)?;
+        // If user just selected a Google Drive folder, immediately write a clean initial snapshot
+        if !storage_dir.is_empty() {
+            let bdate = active_business_date(&c);
+            let _ = perform_eod_snapshot(&db, &c, &format!("INIT_{}", bdate), "Administrator");
+        }
     }
 
     branch_info_json(&db)
 }
+
 
 

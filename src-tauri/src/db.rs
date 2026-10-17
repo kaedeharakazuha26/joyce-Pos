@@ -14,8 +14,12 @@ pub struct BranchInfo {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct BranchConfig {
     pub active_branch: String,
-    pub storage_dir: String, // empty string means default app_data_dir
+    pub storage_dir: String, // Google Drive / Cloud Backup destination folder
     pub branches: Vec<BranchInfo>,
+    #[serde(default)]
+    pub last_backup_at: String,
+    #[serde(default)]
+    pub last_backup_path: String,
 }
 
 pub struct BranchState {
@@ -33,18 +37,23 @@ impl BranchState {
         std::fs::write(self.config_file(), json).map_err(|e| e.to_string())
     }
 
-    pub fn active_base_dir(&self) -> PathBuf {
+    /// Returns the configured Google Drive / external backup directory if set and valid.
+    pub fn backup_base_dir(&self) -> Option<PathBuf> {
         if !self.config.storage_dir.trim().is_empty() {
             let p = PathBuf::from(self.config.storage_dir.trim());
             if p.exists() || std::fs::create_dir_all(&p).is_ok() {
-                return p;
+                return Some(p);
             }
         }
-        self.default_dir.clone()
+        None
     }
 
+    /// Active live SQLite database ALWAYS runs in `default_dir` (local app data folder)
+    /// so SQLite WAL (.db, .db-wal, .db-shm) is never locked or corrupted by real-time
+    /// cloud sync daemons (like Google Drive for Desktop).
+    /// If a branch file previously existed only in `storage_dir`, it is safely copied once
+    /// into `default_dir` so no data is lost.
     pub fn active_db_path(&self) -> PathBuf {
-        let base = self.active_base_dir();
         let branch = self
             .config
             .branches
@@ -52,14 +61,37 @@ impl BranchState {
             .find(|b| b.id == self.config.active_branch)
             .or_else(|| self.config.branches.first());
         let file = branch.map(|b| b.file.as_str()).unwrap_or("joyce_pos.db");
-        base.join(file)
+        let local_path = self.default_dir.join(file);
+        if !local_path.exists() {
+            if let Some(cloud_dir) = self.backup_base_dir() {
+                let cloud_file = cloud_dir.join(file);
+                if cloud_file.exists() {
+                    let _ = std::fs::copy(&cloud_file, &local_path);
+                }
+            }
+        }
+        local_path
+    }
+
+    pub fn active_branch_info(&self) -> BranchInfo {
+        self.config
+            .branches
+            .iter()
+            .find(|b| b.id == self.config.active_branch)
+            .or_else(|| self.config.branches.first())
+            .cloned()
+            .unwrap_or_else(|| BranchInfo {
+                id: "main".into(),
+                name: "Main Store".into(),
+                file: "joyce_pos.db".into(),
+                created_at: String::new(),
+            })
     }
 
     #[allow(dead_code)]
     pub fn branch_db_path(&self, branch_id: &str) -> Option<PathBuf> {
-        let base = self.active_base_dir();
         let branch = self.config.branches.iter().find(|b| b.id == branch_id)?;
-        Some(base.join(&branch.file))
+        Some(self.default_dir.join(&branch.file))
     }
 }
 
@@ -76,6 +108,8 @@ pub fn init_branch_state(default_dir: PathBuf) -> Result<BranchState, String> {
                     file: "joyce_pos.db".into(),
                     created_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                 }],
+                last_backup_at: "".into(),
+                last_backup_path: "".into(),
             }),
             Err(_) => BranchConfig {
                 active_branch: "main".into(),
@@ -86,6 +120,8 @@ pub fn init_branch_state(default_dir: PathBuf) -> Result<BranchState, String> {
                     file: "joyce_pos.db".into(),
                     created_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
                 }],
+                last_backup_at: "".into(),
+                last_backup_path: "".into(),
             },
         }
     } else {
@@ -98,6 +134,8 @@ pub fn init_branch_state(default_dir: PathBuf) -> Result<BranchState, String> {
                 file: "joyce_pos.db".into(),
                 created_at: chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
             }],
+            last_backup_at: "".into(),
+            last_backup_path: "".into(),
         }
     };
 

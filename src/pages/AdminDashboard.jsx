@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Calendar,
   RefreshCw,
@@ -10,8 +10,15 @@ import {
   AlertTriangle,
   Sunrise,
   Sunset,
+  Cloud,
+  DatabaseBackup,
+  HelpCircle,
+  BookOpen,
+  ShieldCheck,
 } from "lucide-react";
-import { DATE_PRESETS } from "../utils";
+import { DATE_PRESETS, peso } from "../utils";
+import { useSettings } from "../App";
+import { useToast } from "../components/ui";
 import { REPORT_TABS } from "../components/admin/adminUtils";
 import { useAdminController } from "../components/admin/useAdminController";
 import {
@@ -24,32 +31,34 @@ import { AdminCrudModals } from "../components/admin/AdminModals";
 
 /**
  * Modern Executive Admin Dashboard, Reporting, Analytics & Full CRUD System
- * Modularized into focused subcomponents under `src/components/admin/`:
- * - `useAdminController.js`: Data fetching, date/filter state, CRUD & export handlers
- * - `AdminKpiGrid.jsx`: 8 KPI summary cards & Alerts/Activity panels
- * - `AdminCharts.jsx`: Interactive Trend Line/Bar, Category Doughnut, Status & Ranking charts
- * - `AdminReportsModule.jsx`: 10-tab Centralized Reports & CRUD toolbar
- * - `AdminOverviewPnL.jsx`: Comprehensive Income Statement (P&L) & Daily Financial Ledger
- * - `AdminSalesInventoryTables.jsx`: Sales, Products, Expenses, and Salaries CRUD tables
- * - `AdminPayrollAuditTables.jsx`: Commissions, LD Commissions, Employees, Shifts, and Audit tables
- * - `AdminModals.jsx`: All 13 CRUD, Receipt, Void, Z-Reading, and Audit Inspection modals
+ * Designed to be beginner/student-friendly with step-by-step visual formulas
+ * and Safe End-of-Day (EOD) Google Drive Backup protection.
  */
-export function AdminDashboard({
-  toast,
-  activeBusinessDate,
-  shiftStatus,
-  openSod,
-  openEod,
-  currentUser,
-  externalCommand,
-  onClearExternalCommand,
-}) {
+export function AdminDashboard(props = {}) {
+  const ctx = useSettings() || {};
+  const ctxToast = useToast();
+
+  const toast = props.toast || ctxToast;
+  const activeBusinessDate = props.activeBusinessDate || ctx.activeBusinessDate;
+  const shiftStatus = props.shiftStatus || ctx.shiftStatus;
+  const openSod = props.openSod || ctx.openSod;
+  const openEod = props.openEod || ctx.openEod;
+  const currentUser = props.currentUser || ctx.currentUser;
+  const branchInfo = props.branchInfo || ctx.branchInfo;
+  const refreshBranchInfo = props.refreshBranchInfo || ctx.refreshBranchInfo;
+  const externalCommand = props.externalCommand || ctx.adminReportIntent;
+  const onClearExternalCommand =
+    props.onClearExternalCommand || ctx.clearAdminReportIntent;
+
+  const [showStudentGuide, setShowStudentGuide] = useState(false);
+
   const ctrl = useAdminController({
     toast,
     activeBusinessDate,
     currentUser,
     externalCommand,
     onClearExternalCommand,
+    refreshBranchInfo,
   });
 
   const {
@@ -62,6 +71,7 @@ export function AdminDashboard({
     setDraftTo,
     loading,
     refreshing,
+    syncingGdrive,
     error,
     data,
     employeesList,
@@ -118,6 +128,7 @@ export function AdminDashboard({
     handleApplyDateRange,
     handleResetAllFilters,
     jumpToReport,
+    handleSyncGdriveNow,
     allProductCategories,
     allStaffNames,
     filteredSales,
@@ -146,10 +157,20 @@ export function AdminDashboard({
   } = ctrl;
 
   const fin = data?.financials || {};
+  const grossSales = Number(fin.gross_sales ?? data?.revenue ?? 0);
+  const cogs = Number(fin.cogs ?? data?.cogs ?? 0);
+  const grossProfit = Number(fin.gross_profit ?? data?.gross_profit ?? 0);
+  const totalOverheads = Number(fin.total_overheads ?? data?.total_overheads ?? 0);
+  const netProfit = Number(fin.net_profit ?? data?.net_profit ?? 0);
+
+  const openShiftObj = shiftStatus?.shift || shiftStatus?.current;
+  const expectedDrawerCash = Number(
+    openShiftObj?.expected_cash ?? shiftStatus?.expected_cash ?? 0
+  );
 
   return (
     <div className="admin-dashboard-root">
-      {/* Print-Only Formal Report Header */}
+      {/* Print-Only Formal Report Header (hidden on screen, visible when printing) */}
       <div className="print-only-header">
         <h1>JOYCE POS — Official Business & Financial Report</h1>
         <p>
@@ -169,7 +190,7 @@ export function AdminDashboard({
         <div className="admin-control-top">
           <div className="admin-period-presets">
             <span className="preset-label">
-              <Calendar size={14} /> Period:
+              <Calendar size={14} /> Date Filter:
             </span>
             {DATE_PRESETS.map((p) => (
               <button
@@ -226,29 +247,57 @@ export function AdminDashboard({
               <div className="shift-indicator open">
                 <Sunrise size={15} />
                 <span>
-                  Active Business Day:{" "}
-                  <b>{shiftStatus.current?.business_date}</b> • Expected Drawer:{" "}
-                  <b>₱{Number(shiftStatus.expected_cash || 0).toFixed(2)}</b>
+                  Open Shift:{" "}
+                  <b>{openShiftObj?.business_date || activeBusinessDate}</b> •
+                  Expected Drawer: <b>{peso(expectedDrawerCash)}</b>
                 </span>
                 <button type="button" className="btn sm warn" onClick={openEod}>
-                  <Sunset size={13} /> End of Day (EOD)
+                  <Sunset size={13} /> End of Day (EOD + Auto Backup)
                 </button>
               </div>
             ) : (
               <div className="shift-indicator closed">
                 <AlertTriangle size={15} />
                 <span>
-                  No Open Shift — Start Business Day (SOD) to record live cash
-                  float
+                  Shift is Closed — Start Day (SOD) before ringing up sales
                 </span>
                 <button type="button" className="btn sm ok" onClick={openSod}>
                   <Sunrise size={13} /> Start Day (SOD)
                 </button>
               </div>
             )}
+
+            {/* Safe Google Drive EOD Snapshot Quick Button */}
+            <button
+              type="button"
+              className="btn ghost sm"
+              onClick={handleSyncGdriveNow}
+              disabled={syncingGdrive}
+              title={
+                branchInfo?.storage_dir
+                  ? `Save a corruption-free snapshot to Google Drive (${branchInfo.storage_dir}/EOD_Backups)`
+                  : "Save a corruption-free snapshot to local EOD_Backups folder"
+              }
+            >
+              <DatabaseBackup size={14} color="var(--accent)" />
+              {syncingGdrive
+                ? "Backing up…"
+                : branchInfo?.storage_dir
+                ? "☁️ Save EOD Backup Now"
+                : "📁 Save EOD Backup Now"}
+            </button>
           </div>
 
           <div className="admin-export-actions">
+            <button
+              type="button"
+              className="btn ghost sm"
+              onClick={() => setShowStudentGuide((v) => !v)}
+              title="Open Student-Friendly Guide to Dashboard & Google Drive Backups"
+            >
+              <BookOpen size={14} color="var(--info)" />
+              {showStudentGuide ? "Hide Guide" : "Student Guide"}
+            </button>
             <button
               type="button"
               className="btn ghost sm"
@@ -319,14 +368,127 @@ export function AdminDashboard({
         )}
       </section>
 
+      {/* 1B. Student-Friendly Simple Profit Formula Bar (Always visible so anyone understands the numbers!) */}
+      <section className="formula-guide-bar card no-print" aria-label="How Store Profit is Calculated">
+        <div className="formula-header-row">
+          <div className="formula-title">
+            <HelpCircle size={16} color="var(--accent)" />
+            <b>Simple Store Profit Formula ({from} to {to}):</b>
+            <span className="muted">Click any box below to inspect the exact records</span>
+          </div>
+          <div className="gdrive-status-pill">
+            <ShieldCheck size={14} color="var(--ok)" />
+            <span>
+              {branchInfo?.storage_dir
+                ? `☁️ Google Drive EOD Backup Active${branchInfo.last_backup_at ? ` (Last: ${branchInfo.last_backup_at.slice(0, 16)})` : ""}`
+                : "💻 Local Lock-Free DB Active (EOD Auto-Backup Enabled)"}
+            </span>
+          </div>
+        </div>
+
+        <div className="formula-steps-row">
+          <button
+            type="button"
+            className="formula-step-box tone-ok"
+            onClick={() => jumpToReport("sales", { status: "completed" })}
+          >
+            <span className="step-tag">STEP 1: MONEY IN</span>
+            <strong>{peso(grossSales)}</strong>
+            <small>Total Customer Sales</small>
+          </button>
+
+          <span className="formula-math-sign">−</span>
+
+          <button
+            type="button"
+            className="formula-step-box tone-info"
+            onClick={() => jumpToReport("products")}
+          >
+            <span className="step-tag">STEP 2: ITEM COST</span>
+            <strong>{peso(cogs)}</strong>
+            <small>Supplier Cost of Items Sold</small>
+          </button>
+
+          <span className="formula-math-sign">=</span>
+
+          <button
+            type="button"
+            className="formula-step-box tone-info"
+            onClick={() => jumpToReport("overview")}
+          >
+            <span className="step-tag">STEP 3: GROSS PROFIT</span>
+            <strong>{peso(grossProfit)}</strong>
+            <small>Profit from Items Sold</small>
+          </button>
+
+          <span className="formula-math-sign">−</span>
+
+          <button
+            type="button"
+            className="formula-step-box tone-warn"
+            onClick={() => jumpToReport("expenses")}
+          >
+            <span className="step-tag">STEP 4: BILLS & STAFF PAY</span>
+            <strong>{peso(totalOverheads)}</strong>
+            <small>Expenses + Salary + Comm + LD</small>
+          </button>
+
+          <span className="formula-math-sign">=</span>
+
+          <button
+            type="button"
+            className={`formula-step-box ${netProfit >= 0 ? "tone-ok" : "tone-bad"}`}
+            onClick={() => jumpToReport("overview")}
+          >
+            <span className="step-tag">STEP 5: TAKE-HOME PROFIT</span>
+            <strong style={{ color: netProfit >= 0 ? "var(--ok)" : "var(--bad)" }}>
+              {peso(netProfit)}
+            </strong>
+            <small>{netProfit >= 0 ? "Final Net Profit 🎉" : "Net Loss ⚠️"}</small>
+          </button>
+        </div>
+
+        {showStudentGuide && (
+          <div className="student-guide-drawer">
+            <div className="student-guide-col">
+              <h4>📊 1. How to Read This Dashboard (Like a Student)</h4>
+              <ul>
+                <li>
+                  <b>Total Sales (Money In):</b> All cash collected from completed customer receipts. (Voided/cancelled receipts are excluded so they don't fake your sales).
+                </li>
+                <li>
+                  <b>Item Cost (COGS — Cost of Goods Sold):</b> What you paid your supplier for the exact items sold. Example: If you buy a drink for ₱30 and sell it for ₱50, Sales = ₱50, COGS = ₱30, and Gross Profit = ₱20.
+                </li>
+                <li>
+                  <b>Bills & Staff Pay (Overheads):</b> Store expenses (electricity, ice, rent, supplies) + Staff Salaries + Regular Commissions + Ladies Drink (LD) Commissions.
+                </li>
+                <li>
+                  <b>Take-Home Net Profit:</b> What the store owner actually keeps after subtracting both Item Cost and all Bills/Staff Pay!
+                </li>
+              </ul>
+            </div>
+            <div className="student-guide-col">
+              <h4>☁️ 2. Why End-of-Day (EOD) Google Drive Backup Never Corrupts Your Database</h4>
+              <ul>
+                <li>
+                  <b>Why Real-Time Cloud Sync Is Risky for SQLite:</b> A live SQLite database uses 3 files at the same time (<code>.db</code>, <code>.db-wal</code>, <code>.db-shm</code>). If Google Drive syncs them mid-sale, it can lock the file (<i>"Database is locked"</i>) or upload mismatched files (corruption).
+                </li>
+                <li>
+                  <b>How JOYCE POS Protects You:</b> During store hours, your live database stays 100% on your fast local disk (zero cloud locking). When you click <b>End of Day (EOD)</b> (or <b>Save EOD Backup Now</b>), SQLite runs <code>VACUUM INTO</code> to write a clean, single-file snapshot into your Google Drive <code>EOD_Backups/</code> folder!
+                </li>
+              </ul>
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* 2. Loading & Error States */}
       {loading && !data && (
         <div className="card loading-state-card">
           <RefreshCw size={28} className="spin" color="var(--accent)" />
-          <h3>Loading Executive Analytics & Financial Ledgers…</h3>
+          <h3>Loading Store Reports & Financial Numbers…</h3>
           <p className="muted">
-            Aggregating transactions, inventory valuations, payroll, and audit
-            logs.
+            Reading receipts, product stock, expenses, staff pay, and activity logs.
           </p>
         </div>
       )}
@@ -340,7 +502,7 @@ export function AdminDashboard({
             <AlertTriangle size={24} color="var(--bad)" />
             <div style={{ flex: 1 }}>
               <h3 style={{ margin: 0, color: "var(--bad)" }}>
-                Database Query Error
+                Could Not Load Dashboard Data
               </h3>
               <p className="muted" style={{ margin: "4px 0 0" }}>
                 {error}
@@ -351,104 +513,100 @@ export function AdminDashboard({
               className="btn primary sm"
               onClick={() => loadAll(from, to)}
             >
-              Retry
+              Retry Now
             </button>
           </div>
         </div>
       )}
 
-      {/* 3. Executive KPI Summary Grid (8 Cards) */}
+      {/* 3. Main Dashboard Content */}
       {data && (
-        <AdminKpiGrid
-          data={data}
-          from={from}
-          to={to}
-          jumpToReport={jumpToReport}
-        />
+        <>
+          <AdminKpiGrid
+            loading={loading}
+            data={data}
+            activeBusinessDate={activeBusinessDate}
+            handleApplyDateRange={handleApplyDateRange}
+            jumpToReport={jumpToReport}
+          />
+
+          <AdminAlertsAndActivity
+            data={data}
+            auditLogs={auditLogs}
+            openSod={openSod}
+            jumpToReport={jumpToReport}
+            onInspectAudit={(item) => setViewingAuditItem(item)}
+          />
+
+          <AdminChartsSection
+            data={data}
+            from={from}
+            to={to}
+            categoryFilter={categoryFilter}
+            setCategoryFilter={setCategoryFilter}
+            jumpToReport={jumpToReport}
+          />
+
+          <AdminReportsModule
+            reportSectionRef={reportSectionRef}
+            reportTab={reportTab}
+            setReportTab={setReportTab}
+            from={from}
+            to={to}
+            search={search}
+            setSearch={setSearch}
+            categoryFilter={categoryFilter}
+            setCategoryFilter={setCategoryFilter}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            staffFilter={staffFilter}
+            setStaffFilter={setStaffFilter}
+            allProductCategories={allProductCategories}
+            allStaffNames={allStaffNames}
+            commissionTypes={commissionTypes}
+            employeesList={employeesList}
+            selectedIds={selectedIds}
+            setSelectedIds={setSelectedIds}
+            handleBulkDelete={handleBulkDelete}
+            setEditingProduct={setEditingProduct}
+            setRestockModal={setRestockModal}
+            setEditingExpense={setEditingExpense}
+            setEditingSalary={setEditingSalary}
+            setEditingCommission={setEditingCommission}
+            setEditingLdCommission={setEditingLdCommission}
+            setEditingEmployee={setEditingEmployee}
+            setShowAddCommType={setShowAddCommType}
+            setViewingSale={setViewingSale}
+            setVoidingSale={setVoidingSale}
+            setVoidReason={setVoidReason}
+            setViewingShift={setViewingShift}
+            setShiftNotesDraft={setShiftNotesDraft}
+            setViewingAuditItem={setViewingAuditItem}
+            setConfirmAction={setConfirmAction}
+            activeBusinessDate={activeBusinessDate}
+            shiftStatus={shiftStatus}
+            openSod={openSod}
+            openEod={openEod}
+            onApplyDateRange={handleApplyDateRange}
+            data={data}
+            fin={fin}
+            filteredSales={filteredSales}
+            filteredProducts={filteredProducts}
+            filteredExpenses={filteredExpenses}
+            filteredSalaries={filteredSalaries}
+            filteredCommissions={filteredCommissions}
+            filteredLdCommissions={filteredLdCommissions}
+            filteredEmployees={filteredEmployees}
+            filteredShifts={filteredShifts}
+            filteredAudit={filteredAudit}
+            jumpToReport={jumpToReport}
+            loadAll={loadAll}
+            toast={ctrl.toast}
+          />
+        </>
       )}
 
-      {/* 4. Interactive Charts & Data Visualization Section */}
-      {data && (
-        <AdminChartsSection
-          data={data}
-          fin={fin}
-          counts={data.counts || {}}
-          from={from}
-          to={to}
-          categoryFilter={categoryFilter}
-          jumpToReport={jumpToReport}
-        />
-      )}
-
-      {/* 5. Actionable Alerts & Recent Activity Strip */}
-      {data && (
-        <AdminAlertsAndActivity
-          data={data}
-          auditLogs={auditLogs}
-          openSod={openSod}
-          jumpToReport={jumpToReport}
-          onInspectAudit={setViewingAuditItem}
-        />
-      )}
-
-      {/* 6. Centralized Reports & Full CRUD Data Management Module */}
-      <AdminReportsModule
-        reportSectionRef={reportSectionRef}
-        reportTab={reportTab}
-        setReportTab={setReportTab}
-        data={data}
-        from={from}
-        to={to}
-        search={search}
-        setSearch={setSearch}
-        categoryFilter={categoryFilter}
-        setCategoryFilter={setCategoryFilter}
-        statusFilter={statusFilter}
-        setStatusFilter={setStatusFilter}
-        staffFilter={staffFilter}
-        setStaffFilter={setStaffFilter}
-        allProductCategories={allProductCategories}
-        allStaffNames={allStaffNames}
-        commissionTypes={commissionTypes}
-        employeesList={employeesList}
-        activeBusinessDate={activeBusinessDate}
-        shiftStatus={shiftStatus}
-        openSod={openSod}
-        openEod={openEod}
-        filteredSales={filteredSales}
-        filteredProducts={filteredProducts}
-        filteredExpenses={filteredExpenses}
-        filteredSalaries={filteredSalaries}
-        filteredCommissions={filteredCommissions}
-        filteredLdCommissions={filteredLdCommissions}
-        filteredEmployees={filteredEmployees}
-        filteredShifts={filteredShifts}
-        filteredAudit={filteredAudit}
-        selectedIds={selectedIds}
-        setSelectedIds={setSelectedIds}
-        handleBulkDelete={handleBulkDelete}
-        setEditingProduct={setEditingProduct}
-        setRestockModal={setRestockModal}
-        setEditingExpense={setEditingExpense}
-        setEditingSalary={setEditingSalary}
-        setEditingCommission={setEditingCommission}
-        setShowAddCommType={setShowAddCommType}
-        setEditingLdCommission={setEditingLdCommission}
-        setEditingEmployee={setEditingEmployee}
-        setViewingSale={setViewingSale}
-        setVoidingSale={setVoidingSale}
-        setVoidReason={setVoidReason}
-        setViewingShift={setViewingShift}
-        setShiftNotesDraft={setShiftNotesDraft}
-        setViewingAuditItem={setViewingAuditItem}
-        setConfirmAction={setConfirmAction}
-        jumpToReport={jumpToReport}
-        onApplyDateRange={handleApplyDateRange}
-        loadAll={loadAll}
-        toast={toast}
-      />
-
-      {/* 7. CRUD & Inspection Modals */}
+      {/* 4. All CRUD, Inspection & Confirmation Modals */}
       <AdminCrudModals
         editingProduct={editingProduct}
         setEditingProduct={setEditingProduct}
@@ -468,13 +626,18 @@ export function AdminDashboard({
         setEditingCommission={setEditingCommission}
         handleSaveCommission={handleSaveCommission}
         commissionTypes={commissionTypes}
-        setCommissionTypes={setCommissionTypes}
         editingLdCommission={editingLdCommission}
         setEditingLdCommission={setEditingLdCommission}
         handleSaveLdCommission={handleSaveLdCommission}
         editingEmployee={editingEmployee}
         setEditingEmployee={setEditingEmployee}
         handleSaveEmployee={handleSaveEmployee}
+        showAddCommType={showAddCommType}
+        setShowAddCommType={setShowAddCommType}
+        newCommTypeModal={newCommTypeModal}
+        setNewCommTypeModal={setNewCommTypeModal}
+        setCommissionTypes={setCommissionTypes}
+        toast={ctrl.toast}
         viewingSale={viewingSale}
         setViewingSale={setViewingSale}
         setVoidingSale={setVoidingSale}
@@ -489,17 +652,11 @@ export function AdminDashboard({
         handleSaveShiftNotes={handleSaveShiftNotes}
         viewingAuditItem={viewingAuditItem}
         setViewingAuditItem={setViewingAuditItem}
-        showAddCommType={showAddCommType}
-        setShowAddCommType={setShowAddCommType}
-        newCommTypeModal={newCommTypeModal}
-        setNewCommTypeModal={setNewCommTypeModal}
         confirmAction={confirmAction}
         setConfirmAction={setConfirmAction}
-        toast={toast}
       />
     </div>
   );
 }
 
 export default AdminDashboard;
-

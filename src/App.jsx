@@ -447,11 +447,16 @@ export default function App() {
         eodForm.notes
       );
       await loadShiftStatus();
+      await loadBranchInfo();
       await refreshAlerts();
       setShowEodModal(false);
       setEodForm({ closingCash: "", notes: "" });
+      const bkp = summary?.eod_backup;
+      const bkpMsg = bkp?.ok
+        ? `\n\n☁️ Automatic EOD Backup Saved (${bkp.is_google_drive ? "Google Drive Folder" : "Local EOD_Backups"}):\n${bkp.archive_path}`
+        : "";
       alert(
-        `Business Day [${summary.business_date}] closed successfully!\n\nExpected Cash: ₱${summary.expected_cash}\nClosing Count: ₱${summary.closing_cash}\nVariance: ₱${summary.variance}`
+        `Business Day [${summary.business_date}] closed successfully!\n\nExpected Cash: ₱${summary.expected_cash}\nClosing Count: ₱${summary.closing_cash}\nVariance: ₱${summary.variance}${bkpMsg}`
       );
     } catch (err) {
       alert("Failed to end day: " + err);
@@ -1561,6 +1566,21 @@ export default function App() {
                       />
                     </Field>
 
+                    <div
+                      style={{
+                        background: "rgba(56, 189, 248, 0.08)",
+                        border: "1px solid rgba(56, 189, 248, 0.3)",
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                        fontSize: 12,
+                        marginTop: 10,
+                        lineHeight: 1.5,
+                      }}
+                    >
+                      <b>☁️ Safe End-of-Day Backup:</b> Closing the day will automatically save a clean, corruption-free snapshot (<code>VACUUM INTO</code>) to{" "}
+                      <b>{branchInfo?.storage_dir ? "your Google Drive EOD_Backups folder" : "your local EOD_Backups folder"}</b>.
+                    </div>
+
                     <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
                       <button
                         type="button"
@@ -1576,7 +1596,7 @@ export default function App() {
                         disabled={submittingShift || eodForm.closingCash === ""}
                         style={{ flex: 1 }}
                       >
-                        <Sunset size={16} /> {submittingShift ? "Closing Shift…" : "Confirm End of Day (Close Shift)"}
+                        <Sunset size={16} /> {submittingShift ? "Closing & Backing Up…" : "Confirm End of Day & Save EOD Backup"}
                       </button>
                     </div>
                   </form>
