@@ -1,17 +1,17 @@
 # Graph Report - Joy-Pos-Multiplatform  (2026-10-19)
 
 ## Corpus Check
-- 50 files · ~148,078 words
+- 50 files · ~149,099 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .icns 1, .ico 1)
 
 ## Summary
-- 395 nodes · 1326 edges · 22 communities (13 shown, 9 thin omitted)
+- 395 nodes · 1327 edges · 22 communities (13 shown, 9 thin omitted)
 - Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 112 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `ddd50362`
+- Built from commit: `6c483878`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -76,15 +76,15 @@ Nodes (17): app, security, windows, build, beforeBuildCommand, beforeDevCommand,
 
 ### Community 4 - "ui.jsx"
 Cohesion: 0.26
-Nodes (20): lucide-react, AdminChartsSection(), InteractiveDoughnutChart(), InteractiveTrendChart(), AdminAlertsAndActivity(), AdminKpiGrid(), AdminOverviewPnL(), TablePagination() (+12 more)
+Nodes (17): AdminChartsSection(), InteractiveDoughnutChart(), InteractiveTrendChart(), AdminAlertsAndActivity(), AdminKpiGrid(), AdminOverviewPnL(), TablePagination(), AdminPayrollAuditTables() (+9 more)
 
 ### Community 5 - "App.jsx"
-Cohesion: 0.19
-Nodes (33): react, api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx, useSettings(), PinLock() (+25 more)
+Cohesion: 0.20
+Nodes (35): lucide-react, react, api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx, useSettings() (+27 more)
 
 ### Community 6 - "ymd"
-Cohesion: 0.39
-Nodes (15): RangeBar(), ToastCtx, Dashboard(), Stat(), daysAgo(), lastMonthRange(), lastWeekRange(), monthStart() (+7 more)
+Cohesion: 0.36
+Nodes (16): RangeBar(), ToastCtx, Commission(), CommissionBase(), LDCommission(), daysAgo(), lastMonthRange(), lastWeekRange() (+8 more)
 
 ### Community 7 - "db.rs"
 Cohesion: 0.14

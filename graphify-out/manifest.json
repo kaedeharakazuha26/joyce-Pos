@@ -1,8 +1,8 @@
 {
   "package.json": {
-    "mtime": 1792165915.2644866,
-    "seen": 1792166721.7747786,
-    "ast_hash": "cfa8bb4550f5291456ed0f07b39271ec",
+    "mtime": 1792343633.1942332,
+    "seen": 1792343664.673267,
+    "ast_hash": "e0f962cb985930fddda01572ec9caa2e",
     "semantic_hash": ""
   },
   "scripts/set-version.mjs": {
@@ -12,9 +12,9 @@
     "semantic_hash": ""
   },
   "src-tauri/Cargo.toml": {
-    "mtime": 1792165923.9142969,
-    "seen": 1792166721.7747886,
-    "ast_hash": "73fca964c0b1b37821d368d1d5fad554",
+    "mtime": 1792343633.196233,
+    "seen": 1792343664.6732795,
+    "ast_hash": "ac4a9558050f0d8d266117a9822c4dbf",
     "semantic_hash": ""
   },
   "src-tauri/build.rs": {
@@ -60,15 +60,15 @@
     "semantic_hash": ""
   },
   "src-tauri/tauri.conf.json": {
-    "mtime": 1792165928.1495745,
-    "seen": 1792166721.7747998,
-    "ast_hash": "0c3d528db1e21b25a75bc4fdbe9f2e1b",
+    "mtime": 1792343633.195233,
+    "seen": 1792343664.673312,
+    "ast_hash": "15237b7a072e9f25f6e2b1baf80481ed",
     "semantic_hash": ""
   },
   "src/App.jsx": {
-    "mtime": 1792340516.476466,
-    "seen": 1792341781.30067,
-    "ast_hash": "1508cdbb036be51d76aac0164738f90b",
+    "mtime": 1792343391.6603796,
+    "seen": 1792343664.6733136,
+    "ast_hash": "5c79f46f2a6d932a32ee3e7843fc8559",
     "semantic_hash": ""
   },
   "src/api.js": {
@@ -126,9 +126,9 @@
     "semantic_hash": ""
   },
   "src/pages/Settings.jsx": {
-    "mtime": 1792330238.4146273,
-    "seen": 1792335429.856439,
-    "ast_hash": "5ff6a17107e26f9aea7b5aafb7ed634a",
+    "mtime": 1792343526.203412,
+    "seen": 1792343664.6733515,
+    "ast_hash": "1bb06fde2c42def9aabbb37235a91991",
     "semantic_hash": ""
   },
   "src/pages/Transactions.jsx": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "src/components/PinLock.jsx": {
-    "mtime": 1792174710.0599444,
-    "seen": 1792174879.9010875,
-    "ast_hash": "2f6e57bef0bcf4912352f6c6b25a2fad",
+    "mtime": 1792343380.5222943,
+    "seen": 1792343664.6733186,
+    "ast_hash": "7292992dc9405c9b7eefce6443fe113e",
     "semantic_hash": ""
   },
   "src/pages/AdminDashboard.jsx": {

@@ -85,12 +85,12 @@ export default function Dashboard() {
   // Parse disabled menus for this branch to exclude them from reporting
   const disabledMenus = settings?.disabled_menus
     ? (() => {
-        try {
-          return JSON.parse(settings.disabled_menus);
-        } catch {
-          return [];
-        }
-      })()
+      try {
+        return JSON.parse(settings.disabled_menus);
+      } catch {
+        return [];
+      }
+    })()
     : [];
 
   const showExpenses = !disabledMenus.includes("expenses");
@@ -833,10 +833,10 @@ export default function Dashboard() {
                             i === 0
                               ? "#ffb020"
                               : i === 1
-                              ? "var(--muted)"
-                              : i === 2
-                              ? "#cd7f32"
-                              : "inherit",
+                                ? "var(--muted)"
+                                : i === 2
+                                  ? "#cd7f32"
+                                  : "inherit",
                         }}
                       >
                         {i === 0 ? "★ 1" : `#${i + 1}`}
