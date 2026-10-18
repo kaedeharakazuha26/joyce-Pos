@@ -90,9 +90,9 @@
     "semantic_hash": ""
   },
   "src/pages/Dashboard.jsx": {
-    "mtime": 1792335203.1300309,
-    "seen": 1792335429.856427,
-    "ast_hash": "9cafa0cf028960d36e3151606ed07a81",
+    "mtime": 1792338373.252347,
+    "seen": 1792338591.7528079,
+    "ast_hash": "698dcaf3ce116b2253d9cb56bb9457cd",
     "semantic_hash": ""
   },
   "src/pages/Expenses.jsx": {
@@ -288,15 +288,15 @@
     "semantic_hash": ""
   },
   "src/pages/AdminDashboard.jsx": {
-    "mtime": 1792328663.4976063,
-    "seen": 1792335429.8564239,
-    "ast_hash": "30a331ca40672d7611f9c0734b1346cd",
+    "mtime": 1792337734.0655107,
+    "seen": 1792338591.7528048,
+    "ast_hash": "de6f428749478f965b8057f8172c7751",
     "semantic_hash": ""
   },
   "src/components/admin/AdminCharts.jsx": {
-    "mtime": 1792232981.2586884,
-    "seen": 1792233715.1260664,
-    "ast_hash": "77247d5294fd109d98d34bcd7d4b2763",
+    "mtime": 1792337652.1238856,
+    "seen": 1792338591.7527888,
+    "ast_hash": "38336eac567997d58b05ef1b7d56de43",
     "semantic_hash": ""
   },
   "src/components/admin/AdminKpiGrid.jsx": {
@@ -324,27 +324,27 @@
     "semantic_hash": ""
   },
   "src/components/admin/AdminReportsModule.jsx": {
-    "mtime": 1792328319.8359768,
-    "seen": 1792335429.8564136,
-    "ast_hash": "5a9c3a99ccce17664e6b9fec899ab7fd",
+    "mtime": 1792337834.3252757,
+    "seen": 1792338591.752797,
+    "ast_hash": "ff6b4240abd0376b642e39e2516ef98a",
     "semantic_hash": ""
   },
   "src/components/admin/AdminSalesInventoryTables.jsx": {
-    "mtime": 1792328734.9561548,
-    "seen": 1792335429.8564155,
-    "ast_hash": "6bfdabcaecb43ee3d52bab6466881432",
+    "mtime": 1792338171.334822,
+    "seen": 1792338591.7527983,
+    "ast_hash": "2108d370d86d1c974196174d23c72b7e",
     "semantic_hash": ""
   },
   "src/components/admin/adminUtils.js": {
-    "mtime": 1792232815.2744038,
-    "seen": 1792233715.1260912,
-    "ast_hash": "972748a5edd5cea3d06f51b83d9324ae",
+    "mtime": 1792337710.4113302,
+    "seen": 1792338591.7527995,
+    "ast_hash": "903039bda11ed2a9f76e067352aca70e",
     "semantic_hash": ""
   },
   "src/components/admin/useAdminController.js": {
-    "mtime": 1792330075.9563968,
-    "seen": 1792335429.8564188,
-    "ast_hash": "a8518d5d27fbd0b823c9fb129a6b5347",
+    "mtime": 1792337507.461782,
+    "seen": 1792338591.7528007,
+    "ast_hash": "1afee537a74764e806d55efeea7caa67",
     "semantic_hash": ""
   },
   "src-tauri/src/cmds/auth.rs": {
@@ -360,9 +360,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/cmds/dashboard.rs": {
-    "mtime": 1792330061.5692878,
-    "seen": 1792335429.85637,
-    "ast_hash": "adaacc92063f02c01ffc1bc625a402ac",
+    "mtime": 1792337420.7561204,
+    "seen": 1792338591.7527597,
+    "ast_hash": "be09940da3638122435f0c3459b7b893",
     "semantic_hash": ""
   },
   "src-tauri/src/cmds/employees.rs": {
@@ -408,9 +408,9 @@
     "semantic_hash": ""
   },
   "src/components/DashboardCrudModule.jsx": {
-    "mtime": 1792328775.875469,
-    "seen": 1792335429.8563995,
-    "ast_hash": "d66836c16703ba3270c3bc8dade8875e",
+    "mtime": 1792338452.8439484,
+    "seen": 1792338591.752785,
+    "ast_hash": "77dc8d00889d32344cf42d5508ffe8d5",
     "semantic_hash": ""
   }
 }

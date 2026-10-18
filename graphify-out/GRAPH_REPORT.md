@@ -1,17 +1,17 @@
 # Graph Report - Joy-Pos-Multiplatform  (2026-10-18)
 
 ## Corpus Check
-- 50 files · ~140,605 words
+- 50 files · ~144,741 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .icns 1, .ico 1)
 
 ## Summary
-- 393 nodes · 1310 edges · 25 communities (16 shown, 9 thin omitted)
+- 393 nodes · 1309 edges · 24 communities (15 shown, 9 thin omitted)
 - Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 108 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `56a50d16`
+- Built from commit: `c7c05346`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -29,7 +29,6 @@
 - set-version.mjs
 - joyce-pos
 - adminUtils.js
-- auth.rs
 - AdminModals.jsx
 - JOYCE POS
 - rows
@@ -57,13 +56,13 @@
   src-tauri/src/cmds/dashboard.rs → src-tauri/src/cmds/common.rs
 - `build_activity_feed()` --calls--> `rows()`  [INFERRED]
   src-tauri/src/cmds/dashboard.rs → src-tauri/src/cmds/common.rs
-- `list_audit_logs()` --calls--> `build_activity_feed()`  [INFERRED]
-  src-tauri/src/cmds/system.rs → src-tauri/src/cmds/dashboard.rs
+- `admin_dashboard()` --calls--> `active_business_date()`  [INFERRED]
+  src-tauri/src/cmds/dashboard.rs → src-tauri/src/cmds/common.rs
 
 ## Import Cycles
 - None detected.
 
-## Communities (25 total, 9 thin omitted)
+## Communities (24 total, 9 thin omitted)
 
 ### Community 1 - "package.json"
 Cohesion: 0.07
@@ -94,20 +93,16 @@ Cohesion: 0.14
 Nodes (5): BranchConfig, BranchInfo, BranchState, init(), init_branch_state()
 
 ### Community 8 - "common"
-Cohesion: 0.15
-Nodes (4): r2(), admin_dashboard(), build_activity_feed(), dashboard()
+Cohesion: 0.16
+Nodes (5): change_admin_pin(), delete_cashier(), list_cashiers(), save_cashier(), verify_pin()
 
 ### Community 9 - "default.json"
 Cohesion: 0.33
 Nodes (5): description, identifier, permissions, $schema, windows
 
 ### Community 14 - "adminUtils.js"
-Cohesion: 0.26
+Cohesion: 0.25
 Nodes (13): AdminChartsSection(), InteractiveDoughnutChart(), InteractiveTrendChart(), aggregateDailySeries(), buildExcelHtml(), buildExportDataset(), CHART_COLORS, REPORT_TABS (+5 more)
-
-### Community 15 - "auth.rs"
-Cohesion: 0.56
-Nodes (5): change_admin_pin(), delete_cashier(), list_cashiers(), save_cashier(), verify_pin()
 
 ### Community 16 - "AdminModals.jsx"
 Cohesion: 0.60
@@ -118,12 +113,12 @@ Cohesion: 0.05
 Nodes (39): 1. Variant-Aware Inventory Deduction, 2. Shift Cash Reconciliation (SOD & EOD), 3. Native Thermal Printer Pipeline, 4. Multi-Branch Isolation, Architecture & How It Works, Automated Git Hooks, Backup & Disaster Recovery, Building for Production (+31 more)
 
 ### Community 21 - "rows"
-Cohesion: 0.12
+Cohesion: 0.13
 Nodes (33): active_business_date(), business_now(), get_active_shift(), log_audit(), now(), num(), rows(), scalar() (+25 more)
 
 ### Community 23 - "Db"
-Cohesion: 0.16
-Nodes (26): list_usb_devices(), print_receipt(), print_test(), end_day(), get_shift_status(), list_shifts(), start_day(), update_shift_notes() (+18 more)
+Cohesion: 0.13
+Nodes (30): r2(), admin_dashboard(), build_activity_feed(), dashboard(), list_usb_devices(), print_receipt(), print_test(), end_day() (+22 more)
 
 ### Community 26 - "sales.rs"
 Cohesion: 0.53
@@ -137,7 +132,7 @@ Nodes (5): create_sale(), list_sales(), list_voided(), sale_detail(), void_sale(
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Db` connect `Db` to `db.rs`, `common`, `auth.rs`, `rows`, `sales.rs`?**
+- **Why does `Db` connect `Db` to `common`, `sales.rs`, `rows`, `db.rs`?**
   _High betweenness centrality (0.097) - this node is a cross-community bridge._
 - **Are the 30 inferred relationships involving `rows()` (e.g. with `delete_cashier()` and `list_cashiers()`) actually correct?**
   _`rows()` has 30 INFERRED edges - model-reasoned connections that need verification._

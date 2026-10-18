@@ -14,14 +14,13 @@
   "12": "main.rs",
   "13": "joyce-pos",
   "14": "adminUtils.js",
-  "15": "auth.rs",
+  "15": "Connection",
   "16": "AdminModals.jsx",
-  "17": "Connection",
-  "18": "R",
-  "19": "State",
+  "17": "R",
+  "18": "State",
+  "19": "Value",
   "20": "JOYCE POS",
   "21": "rows",
-  "22": "Value",
   "23": "Db",
   "26": "sales.rs"
 }
