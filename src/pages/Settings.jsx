@@ -99,7 +99,7 @@ export default function Settings() {
   const loadCashiers = useCallback(() => {
     api.cashiers()
       .then(setCashiersList)
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -189,18 +189,18 @@ export default function Settings() {
     setCashierModal(
       cashier
         ? {
-            id: cashier.id,
-            name: cashier.name,
-            pin: cashier.pin,
-            permissions: Array.isArray(cashier.permissions_list)
-              ? cashier.permissions_list
-              : ["pos", "transactions"],
-          }
+          id: cashier.id,
+          name: cashier.name,
+          pin: cashier.pin,
+          permissions: Array.isArray(cashier.permissions_list)
+            ? cashier.permissions_list
+            : ["pos", "transactions"],
+        }
         : {
-            name: "",
-            pin: "",
-            permissions: ["pos", "transactions"],
-          }
+          name: "",
+          pin: "",
+          permissions: ["pos", "transactions"],
+        }
     );
   };
 
@@ -316,7 +316,7 @@ export default function Settings() {
 
   useEffect(() => {
     if (tab === "printer" && s.printer_conn === "usb") {
-      api.usbDevices().then(setUsb).catch(() => {});
+      api.usbDevices().then(setUsb).catch(() => { });
     }
   }, [tab, s.printer_conn]);
 
@@ -625,11 +625,11 @@ export default function Settings() {
             </div>
           </div>
 
-          {/* Student-Friendly Guide Card: Why EOD Backup Prevents Corruption */}
+          {/*Guide Card: Why EOD Backup Prevents Corruption */}
           <div className="card">
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
               <Info size={18} color="var(--accent)" />
-              <h4 style={{ margin: 0 }}>📚 Student Guide: Why End-of-Day (EOD) Backup Prevents Database Locking & Corruption</h4>
+              <h4 style={{ margin: 0 }}>Why End-of-Day (EOD) Backup Prevents Database Locking & Corruption</h4>
             </div>
             <div style={{ fontSize: 13, lineHeight: 1.7, color: "var(--muted)", display: "flex", flexDirection: "column", gap: 8 }}>
               <div>
