@@ -7,7 +7,7 @@
   "5": "App.jsx",
   "6": "ymd",
   "7": "db.rs",
-  "8": "common",
+  "8": "shifts.rs",
   "9": "default.json",
   "10": "set-version.mjs",
   "11": "build.rs",
@@ -21,6 +21,5 @@
   "19": "Value",
   "20": "JOYCE POS",
   "21": "rows",
-  "23": "Db",
-  "26": "sales.rs"
+  "23": "Db"
 }
