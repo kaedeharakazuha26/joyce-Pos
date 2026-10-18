@@ -371,8 +371,8 @@ export default function Settings() {
             <h3>Theme</h3>
             <div className="theme-pick">
               {[
-                ["light", "Light mode", Sun],
-                ["dark", "Dark mode", Moon],
+                ["dark", "Black Gold Theme (Dark)", Moon],
+                ["light", "White Gold Theme (Light)", Sun],
               ].map(([id, label, Icon]) => (
                 <button
                   key={id}

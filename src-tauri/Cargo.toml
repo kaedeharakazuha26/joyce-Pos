@@ -1,6 +1,6 @@
 [package]
 name = "joyce-pos"
-version = "0.1.0"
+version = "1.0.0"
 description = "JOYCE POS"
 edition = "2021"
 

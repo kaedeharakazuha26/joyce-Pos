@@ -622,7 +622,13 @@ export default function App() {
         }}
       >
         {!currentUser ? (
-          <PinLock onUnlock={handleUnlock} />
+          <PinLock
+            onUnlock={handleUnlock}
+            settings={settings}
+            activeBranchName={activeBranchName}
+            shiftStatus={shiftStatus}
+            toggleTheme={toggleTheme}
+          />
         ) : (
           <div className={`app ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
             {/* Mobile backdrop when sidebar drawer is open */}
