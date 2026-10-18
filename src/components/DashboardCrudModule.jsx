@@ -16,6 +16,9 @@ import {
   ShieldAlert,
   AlertTriangle,
   Users,
+  ClipboardList,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { api } from "../api";
 import { Modal, Field, StatusBadge, Empty, useToast, Receipt as ReceiptDoc } from "./ui";
@@ -28,11 +31,14 @@ export function DashboardCrudModule({
   currentUser,
   settings,
   onDataChanged,
+  inventoryReport = [],
+  variantSales = [],
 }) {
   const toast = useToast();
-  const [tab, setTab] = useState("sales"); // sales | expenses | salary | commission | ld-commission
+  const [tab, setTab] = useState("sales"); // sales | inventory-report | expenses | salary | commission | ld-commission
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [expandedInventory, setExpandedInventory] = useState({});
 
   // Tab data lists
   const [salesList, setSalesList] = useState([]);
@@ -359,6 +365,13 @@ export function DashboardCrudModule({
           </button>
           <button
             type="button"
+            className={`chip ${tab === "inventory-report" ? "active" : ""}`}
+            onClick={() => setTab("inventory-report")}
+          >
+            <ClipboardList size={14} /> Inventory Report
+          </button>
+          <button
+            type="button"
             className={`chip ${tab === "expenses" ? "active" : ""}`}
             onClick={() => setTab("expenses")}
           >
@@ -487,6 +500,16 @@ export function DashboardCrudModule({
             <Plus size={15} /> Add LD Commission
           </button>
         )}
+        {tab === "inventory-report" && (
+          <button
+            type="button"
+            className="btn sm ghost"
+            onClick={() => window.print()}
+            title="Print Inventory Stock & Sales Report"
+          >
+            <Printer size={15} /> Print Report
+          </button>
+        )}
       </div>
 
       {/* Table Content */}
@@ -494,6 +517,156 @@ export function DashboardCrudModule({
         <div style={{ padding: 24, textAlign: "center" }} className="muted">
           Loading {tab} data…
         </div>
+      ) : tab === "inventory-report" ? (
+        (() => {
+          const filtered = (inventoryReport || []).filter((p) => {
+            const q = search.toLowerCase();
+            return (
+              (p.name || "").toLowerCase().includes(q) ||
+              (p.category || "").toLowerCase().includes(q)
+            );
+          });
+
+          if (filtered.length === 0) {
+            return <Empty text="No inventory stock or sales records match your search." />;
+          }
+
+          return (
+            <div style={{ overflowX: "auto" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Item / Product</th>
+                    <th>Category</th>
+                    <th className="num">Current Stock</th>
+                    <th>Health</th>
+                    <th className="num">Price</th>
+                    <th className="num" style={{ background: "rgba(255,122,61,0.06)" }}>Units Sold (Qty)</th>
+                    <th className="num" style={{ background: "rgba(47,207,138,0.06)" }}>Total Amount Sold</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((item) => {
+                    const isExp = !!expandedInventory[item.id];
+                    const vs = (variantSales || []).filter((v) => v.product_id === item.id);
+                    const hasVs = vs.length > 0;
+                    const stock = Number(item.current_stock ?? item.stock ?? 0);
+                    const isOut = stock <= 0;
+                    const isLow = stock > 0 && stock <= Number(item.low_stock ?? 5);
+
+                    return (
+                      <React.Fragment key={item.id}>
+                        <tr className="row-hover">
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <b>{item.name}</b>
+                              {hasVs && (
+                                <button
+                                  type="button"
+                                  className="icon-btn xs"
+                                  onClick={() =>
+                                    setExpandedInventory((prev) => ({
+                                      ...prev,
+                                      [item.id]: !prev[item.id],
+                                    }))
+                                  }
+                                  style={{
+                                    color: "var(--accent, #ff7a3d)",
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    gap: 3,
+                                    background: "rgba(255, 122, 61, 0.12)",
+                                    padding: "2px 6px",
+                                    borderRadius: 4,
+                                    fontSize: "0.75rem",
+                                  }}
+                                >
+                                  {isExp ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                                  <span>{vs.length} variant{vs.length > 1 ? "s" : ""} sold</span>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td>
+                            <span className="badge tone-neutral" style={{ fontSize: "0.78rem" }}>
+                              {item.category || "General"}
+                            </span>
+                          </td>
+                          <td className="num"><b>{stock}</b></td>
+                          <td>
+                            <span className={`badge ${isOut ? "bad" : isLow ? "warn" : "ok"}`} style={{ fontSize: 11 }}>
+                              {isOut ? "Out of Stock" : isLow ? "Low Stock" : "Healthy"}
+                            </span>
+                          </td>
+                          <td className="num">{peso(item.price)}</td>
+                          <td className="num" style={{ background: "rgba(255,122,61,0.05)" }}>
+                            <span
+                              className="badge"
+                              style={{
+                                fontWeight: 700,
+                                background: Number(item.units_sold || 0) > 0 ? "rgba(255, 122, 61, 0.2)" : "transparent",
+                                color: Number(item.units_sold || 0) > 0 ? "#ff7a3d" : "var(--muted)",
+                              }}
+                            >
+                              {Number(item.units_sold || 0).toLocaleString()}
+                            </span>
+                          </td>
+                          <td className="num" style={{ background: "rgba(47,207,138,0.05)" }}>
+                            <b style={{ color: Number(item.total_sold_amount || 0) > 0 ? "var(--ok)" : "var(--muted)" }}>
+                              {peso(item.total_sold_amount || 0)}
+                            </b>
+                          </td>
+                        </tr>
+                        {isExp && hasVs && (
+                          <tr style={{ background: "rgba(255,255,255,0.02)" }}>
+                            <td colSpan={7} style={{ padding: "8px 16px 12px 32px" }}>
+                              <div
+                                style={{
+                                  background: "var(--bg-soft, #1e222d)",
+                                  border: "1px solid var(--border)",
+                                  borderRadius: 8,
+                                  padding: "10px 14px",
+                                }}
+                              >
+                                <b style={{ fontSize: "0.85rem", color: "var(--text)" }}>
+                                  Variant Sales for "{item.name}"
+                                </b>
+                                <table style={{ width: "100%", fontSize: "0.82rem", marginTop: 6 }}>
+                                  <thead>
+                                    <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--muted)" }}>
+                                      <th style={{ textAlign: "left", padding: "4px 8px" }}>Variant</th>
+                                      <th className="num" style={{ padding: "4px 8px" }}>Packs/Qty Sold</th>
+                                      <th className="num" style={{ padding: "4px 8px" }}>Units Sold</th>
+                                      <th className="num" style={{ padding: "4px 8px" }}>Total Amount Sold</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {vs.map((v, i) => (
+                                      <tr key={i} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                                        <td style={{ padding: "6px 8px" }}><b>{v.variant_name}</b></td>
+                                        <td className="num" style={{ padding: "6px 8px" }}>{Number(v.qty_sold || 0).toLocaleString()}</td>
+                                        <td className="num" style={{ padding: "6px 8px" }}>
+                                          <b style={{ color: "var(--accent)" }}>{Number(v.units_sold || 0).toLocaleString()}</b>
+                                        </td>
+                                        <td className="num" style={{ padding: "6px 8px" }}>
+                                          <b style={{ color: "var(--ok)" }}>{peso(v.revenue || 0)}</b>
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          );
+        })()
       ) : tab === "sales" ? (
         salesList.length === 0 ? (
           <Empty text="No sales recorded in this date range" />

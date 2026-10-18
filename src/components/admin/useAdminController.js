@@ -329,9 +329,12 @@ export function useAdminController({
           },
           counts: {
             ...(rawDash?.counts || {}),
-            low_stock: Number(rawDash?.counts?.products_low_stock || 0),
-            out_of_stock: Number(rawDash?.counts?.products_out_of_stock || 0),
-            healthy_stock: Number(rawDash?.counts?.products_healthy || 0),
+            low_stock: Number(rawDash?.counts?.products_low_stock ?? rawDash?.counts?.low_stock ?? 0),
+            out_of_stock: Number(rawDash?.counts?.products_out_of_stock ?? rawDash?.counts?.out_of_stock ?? 0),
+            healthy_stock: Number(rawDash?.counts?.products_healthy ?? rawDash?.counts?.healthy_stock ?? 0),
+            low_stock_count: Number(rawDash?.counts?.products_low_stock ?? rawDash?.counts?.low_stock ?? 0),
+            out_of_stock_count: Number(rawDash?.counts?.products_out_of_stock ?? rawDash?.counts?.out_of_stock ?? 0),
+            healthy_stock_count: Number(rawDash?.counts?.products_healthy ?? rawDash?.counts?.healthy_stock ?? 0),
             active_products: Number(rawDash?.counts?.products_active || 0),
             active_employees: Number(rawDash?.counts?.employees_active || 0),
             expenses_count: Number(rawDash?.counts?.expenses_count || normExpenses.length),
@@ -340,13 +343,21 @@ export function useAdminController({
             ld_commissions_count: Number(rawDash?.counts?.ld_commissions_count || normLdCommissions.length),
           },
           daily: normDaily,
-          by_category: rawDash?.categories || [],
+          by_category: (rawDash?.categories || []).map((c) => ({
+            ...c,
+            qty: Number(c.units ?? c.qty ?? 0),
+            units: Number(c.units ?? c.qty ?? 0),
+            revenue: Number(c.revenue || 0),
+            profit: Number(c.gross_profit ?? c.profit ?? 0),
+          })),
+          expenses_by_cat: rawDash?.expense_categories || [],
           expenses_by_category: rawDash?.expense_categories || [],
+          variant_sales: rawDash?.variant_sales || [],
           top_products: (rawDash?.product_performance || []).map((p) => ({
             ...p,
             total: Number(p.revenue ?? p.total ?? 0),
-            qty: Number(p.qty || 0),
-            profit: Number(p.profit || 0),
+            qty: Number(p.units_sold ?? p.qty ?? 0),
+            profit: Number(p.gross_profit ?? p.profit ?? 0),
           })),
           catalog_performance: rawDash?.catalog_performance || [],
           employee_performance: normEmpPerf,
@@ -577,14 +588,22 @@ export function useAdminController({
     const perfMap = new Map();
     (data?.catalog_performance || []).forEach((cp) => perfMap.set(cp.id, cp));
 
+    const variantSalesMap = new Map();
+    (data?.variant_sales || []).forEach((vs) => {
+      const list = variantSalesMap.get(vs.product_id) || [];
+      list.push(vs);
+      variantSalesMap.set(vs.product_id, list);
+    });
+
     return productsList
       .map((p) => {
         const perf = perfMap.get(p.id) || {};
-        const soldQty = Number(perf.sold_qty || 0);
+        const soldQty = Number(perf.units_sold ?? perf.sold_qty ?? 0);
         const revenue = Number(perf.revenue || 0);
-        const profit = Number(perf.profit || 0);
-        const marginPct = p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0;
+        const profit = Number(perf.gross_profit ?? perf.profit ?? 0);
+        const marginPct = Number(perf.margin_pct ?? (p.price > 0 ? ((p.price - p.cost) / p.price) * 100 : 0));
         const stockStatus = p.stock <= 0 ? "out" : p.stock <= p.low_stock ? "low" : "healthy";
+        const vSales = variantSalesMap.get(p.id) || [];
         return {
           ...p,
           sold_qty: soldQty,
@@ -594,6 +613,8 @@ export function useAdminController({
           stock_value: Number(p.stock || 0) * Number(p.cost || 0),
           retail_value: Number(p.stock || 0) * Number(p.price || 0),
           stock_status: stockStatus,
+          variant_sales: vSales,
+          has_variant_sales: vSales.length > 0,
         };
       })
       .filter((p) => {

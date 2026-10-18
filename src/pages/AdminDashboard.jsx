@@ -54,6 +54,7 @@ const DEFAULT_VISIBILITY = {
     tab_overview: true,
     tab_sales: true,
     tab_products: true,
+    "tab_inventory-report": true,
     tab_expenses: true,
     tab_salaries: true,
     tab_commissions: true,

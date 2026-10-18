@@ -9,6 +9,9 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  ClipboardList,
+  Package,
+  Printer,
 } from "lucide-react";
 import { ymd } from "../../utils";
 import { EXPENSE_CATEGORIES, REPORT_TABS } from "./adminUtils";
@@ -167,24 +170,54 @@ export function AdminReportsModule({
 
           <div className="reports-primary-actions">
             {reportTab === "products" && (
-              <button
-                type="button"
-                className="btn primary"
-                onClick={() =>
-                  setEditingProduct({
-                    name: "",
-                    category: "General",
-                    price: 0,
-                    cost: 0,
-                    stock: 0,
-                    low_stock: 5,
-                    image: "",
-                    variants: [],
-                  })
-                }
-              >
-                <Plus size={16} /> Add New Product
-              </button>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  onClick={() => setReportTab("inventory-report")}
+                  title="View items sold, stock levels, and total amounts sold"
+                >
+                  <ClipboardList size={15} /> Inventory Report
+                </button>
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() =>
+                    setEditingProduct({
+                      name: "",
+                      category: "General",
+                      price: 0,
+                      cost: 0,
+                      stock: 0,
+                      low_stock: 5,
+                      image: "",
+                      variants: [],
+                    })
+                  }
+                >
+                  <Plus size={16} /> Add New Product
+                </button>
+              </div>
+            )}
+            {reportTab === "inventory-report" && (
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  onClick={() => setReportTab("products")}
+                  title="Manage and edit product items"
+                >
+                  <Package size={15} /> Manage Products (CRUD)
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  onClick={() => window.print()}
+                  title="Print Inventory Stock & Sales Report"
+                >
+                  <Printer size={15} /> Print Report
+                </button>
+              </div>
             )}
             {reportTab === "expenses" && (
               <button
@@ -304,7 +337,7 @@ export function AdminReportsModule({
             const Icon = t.icon;
             let countBadge = null;
             if (t.id === "sales") countBadge = filteredSales.length;
-            else if (t.id === "products") countBadge = filteredProducts.length;
+            else if (t.id === "products" || t.id === "inventory-report") countBadge = filteredProducts.length;
             else if (t.id === "expenses") countBadge = filteredExpenses.length;
             else if (t.id === "salaries") countBadge = filteredSalaries.length;
             else if (t.id === "commissions") countBadge = filteredCommissions.length;
@@ -358,7 +391,7 @@ export function AdminReportsModule({
             </div>
 
             <div className="table-contextual-filters">
-              {["sales", "products", "expenses", "commissions"].includes(reportTab) && (
+              {["sales", "products", "inventory-report", "expenses", "commissions"].includes(reportTab) && (
                 <select
                   value={categoryFilter}
                   onChange={(e) => setCategoryFilter(e.target.value)}
@@ -386,7 +419,7 @@ export function AdminReportsModule({
                   <option value="voided">Voided Only</option>
                 </select>
               )}
-              {reportTab === "products" && (
+              {["products", "inventory-report"].includes(reportTab) && (
                 <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
                   <option value="all">All Stock Levels</option>
                   <option value="healthy">Healthy Stock</option>

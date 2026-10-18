@@ -8,6 +8,7 @@ import {
   Smartphone,
   Clock,
   ShieldCheck,
+  ClipboardList,
 } from "lucide-react";
 import { ymd } from "../../utils";
 
@@ -39,6 +40,7 @@ export const REPORT_TABS = [
   { id: "overview", label: "Overview & P&L", icon: BarChart3, badgeTone: "info" },
   { id: "sales", label: "Sales & Receipts", icon: ReceiptIcon, badgeTone: "ok" },
   { id: "products", label: "Products & Stock CRUD", icon: Package, badgeTone: "info" },
+  { id: "inventory-report", label: "Inventory Report", icon: ClipboardList, badgeTone: "ok" },
   { id: "expenses", label: "Expenses CRUD", icon: Wallet, badgeTone: "warn" },
   { id: "salaries", label: "Salaries CRUD", icon: Users, badgeTone: "info" },
   { id: "commissions", label: "Commissions CRUD", icon: Coins, badgeTone: "purple" },

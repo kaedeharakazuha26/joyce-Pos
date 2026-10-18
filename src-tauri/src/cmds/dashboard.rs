@@ -104,6 +104,43 @@ pub fn dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
         "inventory_retail": r2(scalar(&c, "SELECT COALESCE(SUM(stock*price),0) FROM products WHERE active=1", &[])),
         "daily": daily,
         "top": rows(&c, &format!("SELECT name, SUM(units_per*quantity) AS units, SUM(subtotal) AS revenue FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE {range}) GROUP BY product_id ORDER BY revenue DESC LIMIT 8"), p)?,
+        "inventory_report": rows(&c, &format!(
+            r#"
+            SELECT p.id,
+                   p.name,
+                   COALESCE(NULLIF(p.category, ''), 'General') AS category,
+                   p.stock AS current_stock,
+                   p.low_stock,
+                   p.cost,
+                   p.price,
+                   COALESCE(SUM(si.quantity * si.units_per), 0) AS units_sold,
+                   ROUND(COALESCE(SUM(si.subtotal), 0), 2) AS total_sold_amount
+            FROM products p
+            LEFT JOIN (
+                SELECT product_id, quantity, units_per, subtotal
+                FROM sale_items
+                WHERE sale_id IN (SELECT id FROM sales WHERE {range})
+            ) si ON si.product_id = p.id
+            WHERE p.active = 1
+            GROUP BY p.id
+            ORDER BY units_sold DESC, total_sold_amount DESC, p.name ASC
+            "#
+        ), p)?,
+        "variant_sales": rows(&c, &format!(
+            r#"
+            SELECT si.product_id,
+                   si.variant_id,
+                   COALESCE(NULLIF(si.variant_name, ''), (SELECT name FROM variants WHERE id=si.variant_id), 'Default') AS variant_name,
+                   SUM(si.quantity) AS qty_sold,
+                   SUM(si.quantity * si.units_per) AS units_sold,
+                   ROUND(SUM(si.subtotal), 2) AS revenue
+            FROM sale_items si
+            WHERE si.sale_id IN (SELECT id FROM sales WHERE {range})
+              AND si.variant_id IS NOT NULL
+            GROUP BY si.product_id, si.variant_id, variant_name
+            ORDER BY revenue DESC
+            "#
+        ), p)?,
         "low_stock": rows(&c, "SELECT id,name,stock,low_stock FROM products WHERE active=1 AND stock<=low_stock ORDER BY stock LIMIT 10", &[])?,
         "active_business_date": active_business_date(&c),
     }))
@@ -522,6 +559,27 @@ pub fn admin_dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
         p,
     )?;
 
+    // Variant sales in period
+    let variant_sales = rows(
+        &c,
+        &format!(
+            r#"
+            SELECT si.product_id,
+                   si.variant_id,
+                   COALESCE(NULLIF(si.variant_name, ''), (SELECT name FROM variants WHERE id=si.variant_id), 'Default') AS variant_name,
+                   SUM(si.quantity) AS qty_sold,
+                   SUM(si.quantity * si.units_per) AS units_sold,
+                   ROUND(SUM(si.subtotal), 2) AS revenue
+            FROM sale_items si
+            WHERE si.sale_id IN (SELECT id FROM sales WHERE {range})
+              AND si.variant_id IS NOT NULL
+            GROUP BY si.product_id, si.variant_id, variant_name
+            ORDER BY revenue DESC
+            "#
+        ),
+        p,
+    )?;
+
     // Low stock & Out of stock items
     let low_stock_items = rows(
         &c,
@@ -796,6 +854,7 @@ pub fn admin_dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
         "categories": categories,
         "product_performance": product_performance,
         "catalog_performance": catalog_performance,
+        "variant_sales": variant_sales,
         "low_stock_items": low_stock_items,
         "expense_categories": expense_categories,
         "shift_history": shift_history,

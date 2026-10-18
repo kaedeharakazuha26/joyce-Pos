@@ -18,6 +18,11 @@ import {
   BarChart3,
   LineChart,
   Calendar,
+  ClipboardList,
+  Search,
+  X,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { api } from "../api";
 import { PageHeader, RangeBar, Empty, Modal, useToast } from "../components/ui";
@@ -134,6 +139,97 @@ export default function Dashboard() {
       { key: "net", label: "Net Profit", color: "#2fcf8a", enabled: seriesEnabled.net },
     ],
     [seriesEnabled, showExpenses, showSalary, showCommission, showLdCommission]
+  );
+
+  // ── Inventory Stock & Sales Report State & Memos ──
+  const [inventorySearch, setInventorySearch] = useState("");
+  const [inventoryCategory, setInventoryCategory] = useState("all");
+  const [inventorySortKey, setInventorySortKey] = useState("units_sold");
+  const [inventorySortDir, setInventorySortDir] = useState("desc");
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [expandedVariants, setExpandedVariants] = useState({});
+
+  const toggleVariantExpand = useCallback((id) => {
+    setExpandedVariants((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  const toggleInventorySort = useCallback((key) => {
+    setInventorySortKey((prevKey) => {
+      if (prevKey === key) {
+        setInventorySortDir((prevDir) => (prevDir === "asc" ? "desc" : "asc"));
+        return key;
+      }
+      setInventorySortDir("desc");
+      return key;
+    });
+  }, []);
+
+  const enrichedInventory = useMemo(() => {
+    const rawList = d?.inventory_report || [];
+    const variantSalesMap = new Map();
+    (d?.variant_sales || []).forEach((vs) => {
+      const pid = vs.product_id;
+      if (!variantSalesMap.has(pid)) variantSalesMap.set(pid, []);
+      variantSalesMap.get(pid).push(vs);
+    });
+
+    return rawList.map((item) => {
+      const vs = variantSalesMap.get(item.id) || [];
+      return {
+        ...item,
+        variant_sales: vs,
+        has_variant_sales: vs.length > 0,
+      };
+    });
+  }, [d?.inventory_report, d?.variant_sales]);
+
+  const inventoryCategories = useMemo(() => {
+    const set = new Set();
+    (enrichedInventory || []).forEach((p) => {
+      if (p.category) set.add(p.category);
+    });
+    return ["all", ...Array.from(set).sort()];
+  }, [enrichedInventory]);
+
+  const filteredInventory = useMemo(() => {
+    let list = enrichedInventory || [];
+    if (inventoryCategory !== "all") {
+      list = list.filter((p) => p.category === inventoryCategory);
+    }
+    if (inventorySearch.trim()) {
+      const q = inventorySearch.toLowerCase().trim();
+      list = list.filter(
+        (p) =>
+          (p.name || "").toLowerCase().includes(q) ||
+          (p.category || "").toLowerCase().includes(q) ||
+          (p.variant_sales || []).some((v) => (v.variant_name || "").toLowerCase().includes(q))
+      );
+    }
+    const dir = inventorySortDir === "asc" ? 1 : -1;
+    return [...list].sort((a, b) => {
+      const va = a[inventorySortKey] ?? 0;
+      const vb = b[inventorySortKey] ?? 0;
+      if (typeof va === "string") {
+        return dir * va.localeCompare(String(vb));
+      }
+      return dir * (Number(va) - Number(vb));
+    });
+  }, [enrichedInventory, inventoryCategory, inventorySearch, inventorySortKey, inventorySortDir]);
+
+  const inventoryPageSize = 10;
+  const totalInventoryPages = Math.max(1, Math.ceil(filteredInventory.length / inventoryPageSize));
+  const pagedInventory = useMemo(() => {
+    const start = (inventoryPage - 1) * inventoryPageSize;
+    return filteredInventory.slice(start, start + inventoryPageSize);
+  }, [filteredInventory, inventoryPage]);
+
+  const inventoryTotalUnitsSold = useMemo(
+    () => filteredInventory.reduce((acc, item) => acc + Number(item.units_sold || 0), 0),
+    [filteredInventory]
+  );
+  const inventoryTotalAmountSold = useMemo(
+    () => filteredInventory.reduce((acc, item) => acc + Number(item.total_sold_amount || 0), 0),
+    [filteredInventory]
   );
 
   if (!d) {
@@ -698,9 +794,21 @@ export default function Dashboard() {
         </div>
 
         <div className="card">
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-            <ShoppingCart size={18} color="var(--accent)" />
-            <h3 style={{ margin: 0 }}>Top selling products</h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ShoppingCart size={18} color="var(--accent)" />
+              <h3 style={{ margin: 0 }}>Top selling products</h3>
+            </div>
+            <button
+              type="button"
+              className="btn sm ghost"
+              onClick={() => {
+                document.getElementById("inventory-report-section")?.scrollIntoView({ behavior: "smooth" });
+              }}
+              title="Jump to full Inventory Stock & Sales Report"
+            >
+              <ClipboardList size={14} /> Full Inventory Report
+            </button>
           </div>
           {d.top.length === 0 ? (
             <Empty text="Nothing sold yet" />
@@ -747,6 +855,362 @@ export default function Dashboard() {
         </div>
       </section>
 
+      {/* ── Inventory Stock & Sales Report ── */}
+      <section id="inventory-report-section" className="card" style={{ marginBottom: 20 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: 12,
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ClipboardList size={20} color="var(--accent)" />
+              <h3 style={{ margin: 0 }}>Inventory Stock & Sales Report</h3>
+            </div>
+            <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+              Tracking units sold per item, total sales amount, and current stock status for <b>{from}</b> to <b>{to}</b>
+            </p>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            {/* Search */}
+            <div style={{ position: "relative", minWidth: 200 }}>
+              <Search size={14} style={{ position: "absolute", left: 10, top: 10, opacity: 0.5 }} />
+              <input
+                type="text"
+                placeholder="Search items…"
+                style={{ paddingLeft: 30, height: 34, fontSize: 13 }}
+                value={inventorySearch}
+                onChange={(e) => {
+                  setInventorySearch(e.target.value);
+                  setInventoryPage(1);
+                }}
+              />
+              {inventorySearch && (
+                <button
+                  type="button"
+                  className="icon-btn sm"
+                  style={{ position: "absolute", right: 4, top: 4 }}
+                  onClick={() => {
+                    setInventorySearch("");
+                    setInventoryPage(1);
+                  }}
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Category Dropdown */}
+            {inventoryCategories.length > 2 && (
+              <select
+                value={inventoryCategory}
+                onChange={(e) => {
+                  setInventoryCategory(e.target.value);
+                  setInventoryPage(1);
+                }}
+                style={{ height: 34, fontSize: 13, padding: "0 10px" }}
+              >
+                {inventoryCategories.map((c) => (
+                  <option key={c} value={c}>
+                    {c === "all" ? "All Categories" : c}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Print button */}
+            <button
+              type="button"
+              className="btn sm ghost"
+              onClick={handlePrintPdf}
+              title="Print Inventory Stock & Sales Report"
+            >
+              <Printer size={14} /> Print Report
+            </button>
+          </div>
+        </div>
+
+        {/* Summary Metric Strip */}
+        <div
+          className="table-summary-strip"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 16,
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 14px",
+            background: "rgba(255,255,255,0.02)",
+            border: "1px solid var(--border)",
+            borderRadius: 8,
+            marginBottom: 16,
+            fontSize: "0.85rem",
+          }}
+        >
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+            <span>Active Products: <b>{filteredInventory.length}</b></span>
+            <span>
+              Total Units Sold:{" "}
+              <b style={{ color: "var(--accent, #ff7a3d)" }}>
+                {inventoryTotalUnitsSold.toLocaleString()}
+              </b>
+            </span>
+            <span>
+              Total Amount Sold:{" "}
+              <b style={{ color: "var(--ok, #2fcf8a)" }}>
+                {peso(inventoryTotalAmountSold)}
+              </b>
+            </span>
+          </div>
+          <div className="muted" style={{ fontSize: "0.8rem" }}>
+            Attributed to Shift Date: <b>{from}</b> to <b>{to}</b>
+          </div>
+        </div>
+
+        {filteredInventory.length === 0 ? (
+          <Empty text="No inventory stock or sales records match your criteria." />
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th
+                    onClick={() => toggleInventorySort("name")}
+                    style={{ cursor: "pointer", userSelect: "none" }}
+                  >
+                    Item / Product {inventorySortKey === "name" ? (inventorySortDir === "asc" ? "↑" : "↓") : ""}
+                  </th>
+                  <th
+                    onClick={() => toggleInventorySort("category")}
+                    style={{ cursor: "pointer", userSelect: "none" }}
+                  >
+                    Category {inventorySortKey === "category" ? (inventorySortDir === "asc" ? "↑" : "↓") : ""}
+                  </th>
+                  <th
+                    className="num"
+                    onClick={() => toggleInventorySort("current_stock")}
+                    style={{ cursor: "pointer", userSelect: "none" }}
+                  >
+                    Stock {inventorySortKey === "current_stock" ? (inventorySortDir === "asc" ? "↑" : "↓") : ""}
+                  </th>
+                  <th>Health</th>
+                  <th
+                    className="num"
+                    onClick={() => toggleInventorySort("price")}
+                    style={{ cursor: "pointer", userSelect: "none" }}
+                  >
+                    Price {inventorySortKey === "price" ? (inventorySortDir === "asc" ? "↑" : "↓") : ""}
+                  </th>
+                  <th
+                    className="num"
+                    onClick={() => toggleInventorySort("units_sold")}
+                    style={{
+                      cursor: "pointer",
+                      userSelect: "none",
+                      background: "rgba(255, 122, 61, 0.08)",
+                    }}
+                  >
+                    Units Sold (Qty) {inventorySortKey === "units_sold" ? (inventorySortDir === "asc" ? "↑" : "↓") : ""}
+                  </th>
+                  <th
+                    className="num"
+                    onClick={() => toggleInventorySort("total_sold_amount")}
+                    style={{
+                      cursor: "pointer",
+                      userSelect: "none",
+                      background: "rgba(47, 207, 138, 0.08)",
+                    }}
+                  >
+                    Total Amount Sold {inventorySortKey === "total_sold_amount" ? (inventorySortDir === "asc" ? "↑" : "↓") : ""}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {pagedInventory.map((item) => {
+                  const isExpanded = !!expandedVariants[item.id];
+                  const hasVariants = item.has_variant_sales;
+                  const stock = Number(item.current_stock ?? 0);
+                  const lowStock = Number(item.low_stock ?? 5);
+                  const isOut = stock <= 0;
+                  const isLow = stock > 0 && stock <= lowStock;
+
+                  return (
+                    <React.Fragment key={item.id}>
+                      <tr className="row-hover">
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <b>{item.name}</b>
+                            {hasVariants && (
+                              <button
+                                type="button"
+                                className="icon-btn xs"
+                                onClick={() => toggleVariantExpand(item.id)}
+                                title={isExpanded ? "Collapse variants" : "View sold variants breakdown"}
+                                style={{
+                                  color: "var(--accent, #ff7a3d)",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 3,
+                                  background: "rgba(255, 122, 61, 0.12)",
+                                  padding: "2px 6px",
+                                  borderRadius: 4,
+                                  fontSize: "0.75rem",
+                                }}
+                              >
+                                {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                                <span>{item.variant_sales.length} variant{item.variant_sales.length > 1 ? "s" : ""} sold</span>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge tone-neutral" style={{ fontSize: "0.78rem" }}>
+                            {item.category || "General"}
+                          </span>
+                        </td>
+                        <td className="num">
+                          <b>{stock}</b>
+                        </td>
+                        <td>
+                          <span className={`badge ${isOut ? "bad" : isLow ? "warn" : "ok"}`} style={{ fontSize: 11 }}>
+                            {isOut ? "Out of Stock" : isLow ? "Low Stock" : "Healthy"}
+                          </span>
+                        </td>
+                        <td className="num">{peso(item.price)}</td>
+                        <td className="num" style={{ background: "rgba(255, 122, 61, 0.05)" }}>
+                          <span
+                            className="badge"
+                            style={{
+                              fontWeight: 700,
+                              background: item.units_sold > 0 ? "rgba(255, 122, 61, 0.2)" : "transparent",
+                              color: item.units_sold > 0 ? "#ff7a3d" : "var(--muted)",
+                            }}
+                          >
+                            {Number(item.units_sold || 0).toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="num" style={{ background: "rgba(47, 207, 138, 0.05)" }}>
+                          <b style={{ color: item.total_sold_amount > 0 ? "var(--ok)" : "var(--muted)" }}>
+                            {peso(item.total_sold_amount || 0)}
+                          </b>
+                        </td>
+                      </tr>
+
+                      {/* Expandable Variant Breakdown Subrow */}
+                      {isExpanded && hasVariants && (
+                        <tr style={{ background: "rgba(255, 255, 255, 0.02)" }}>
+                          <td colSpan={7} style={{ padding: "8px 16px 12px 32px" }}>
+                            <div
+                              style={{
+                                background: "var(--bg-soft, #1e222d)",
+                                border: "1px solid var(--border)",
+                                borderRadius: 8,
+                                padding: "10px 14px",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                  marginBottom: 6,
+                                }}
+                              >
+                                <b style={{ fontSize: "0.85rem", color: "var(--text)" }}>
+                                  Variant Sales for "{item.name}"
+                                </b>
+                                <span className="muted" style={{ fontSize: "0.78rem" }}>
+                                  Period: {from} to {to}
+                                </span>
+                              </div>
+                              <table style={{ width: "100%", fontSize: "0.82rem" }}>
+                                <thead>
+                                  <tr style={{ borderBottom: "1px solid var(--border)", color: "var(--muted)" }}>
+                                    <th style={{ textAlign: "left", padding: "4px 8px" }}>Variant</th>
+                                    <th className="num" style={{ padding: "4px 8px" }}>Packs/Qty Sold</th>
+                                    <th className="num" style={{ padding: "4px 8px" }}>Units Sold</th>
+                                    <th className="num" style={{ padding: "4px 8px" }}>Total Amount Sold</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {item.variant_sales.map((vs, idx) => (
+                                    <tr key={idx} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
+                                      <td style={{ padding: "6px 8px" }}>
+                                        <b>{vs.variant_name}</b>
+                                      </td>
+                                      <td className="num" style={{ padding: "6px 8px" }}>
+                                        {Number(vs.qty_sold || 0).toLocaleString()}
+                                      </td>
+                                      <td className="num" style={{ padding: "6px 8px" }}>
+                                        <b style={{ color: "var(--accent, #ff7a3d)" }}>
+                                          {Number(vs.units_sold || 0).toLocaleString()}
+                                        </b>
+                                      </td>
+                                      <td className="num" style={{ padding: "6px 8px" }}>
+                                        <b style={{ color: "var(--ok)" }}>
+                                          {peso(vs.revenue || 0)}
+                                        </b>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalInventoryPages > 1 && (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 14,
+              fontSize: "0.85rem",
+              paddingTop: 8,
+              borderTop: "1px solid var(--border)",
+            }}
+          >
+            <span className="muted">
+              Page {inventoryPage} of {totalInventoryPages} ({filteredInventory.length} items)
+            </span>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                type="button"
+                className="btn sm ghost"
+                disabled={inventoryPage <= 1}
+                onClick={() => setInventoryPage((p) => Math.max(1, p - 1))}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="btn sm ghost"
+                disabled={inventoryPage >= totalInventoryPages}
+                onClick={() => setInventoryPage((p) => Math.min(totalInventoryPages, p + 1))}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* ── Operational Records CRUD Module (Sales, Expenses, Salary, Commissions) ── */}
       <DashboardCrudModule
         from={from}
@@ -755,6 +1219,8 @@ export default function Dashboard() {
         currentUser={currentUser}
         settings={settings}
         onDataChanged={load}
+        inventoryReport={enrichedInventory}
+        variantSales={d.variant_sales}
       />
 
       {/* ── PDF Export / Print Preview Modal for Highest Income Per Employee ── */}

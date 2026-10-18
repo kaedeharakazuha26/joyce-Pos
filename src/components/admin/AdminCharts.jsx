@@ -6,6 +6,8 @@ import {
   BarChart3,
   Clock,
   Calendar,
+  Award,
+  Users,
 } from "lucide-react";
 import { Empty, StatusBadge } from "../ui";
 import { peso, pesoShort } from "../../utils";
@@ -397,13 +399,12 @@ export function AdminChartsSection({
   jumpToReport,
 }) {
   const [trendGranularity, setTrendGranularity] = useState("daily");
-  const [trendChartMode, setTrendChartMode] = useState("area");
+  const [trendChartMode, setTrendChartMode] = useState("bar");
   const [showPrevPeriod, setShowPrevPeriod] = useState(true);
   const [seriesEnabled, setSeriesEnabled] = useState({
     revenue: true,
     gross_profit: false,
     net_profit: true,
-    total_overheads: true,
     expenses: false,
     salaries: false,
     commissions: false,
@@ -411,8 +412,7 @@ export function AdminChartsSection({
   });
   const [doughnutMode, setDoughnutMode] = useState("category");
   const [statusChartMode, setStatusChartMode] = useState("sales");
-  const [comparativeMode, setComparativeMode] = useState("products");
-  const [comparativeMetric, setComparativeMetric] = useState("value");
+  const [employeeReportView, setEmployeeReportView] = useState("all"); // "all" | "salary" | "commission" | "ld" | "products"
 
   const fin = data?.financials || {};
   const prev = data?.previous_period || {};
@@ -431,7 +431,6 @@ export function AdminChartsSection({
     { key: "revenue", label: "Gross Sales", color: "#ff7a3d", enabled: seriesEnabled.revenue },
     { key: "gross_profit", label: "Gross Profit", color: "#38bdf8", enabled: seriesEnabled.gross_profit },
     { key: "net_profit", label: "Net Operating Profit", color: "#2fcf8a", enabled: seriesEnabled.net_profit },
-    { key: "total_overheads", label: "Total Overheads", color: "#ff5470", enabled: seriesEnabled.total_overheads },
     { key: "expenses", label: "Store Expenses", color: "#f5b83d", enabled: seriesEnabled.expenses },
     { key: "salaries", label: "Salaries", color: "#a855f7", enabled: seriesEnabled.salaries },
     { key: "commissions", label: "Commissions", color: "#14b8a6", enabled: seriesEnabled.commissions },
@@ -442,17 +441,18 @@ export function AdminChartsSection({
     if (!data) return [];
     if (doughnutMode === "category") {
       return (data.by_category || []).map((c, idx) => ({
-        name: c.category || "Uncategorized",
+        name: c.category || "General",
         value: Number(c.revenue || 0),
-        count: `${c.qty} sold`,
+        count: `${Number(c.units ?? c.qty ?? 0)} sold`,
         color: CHART_COLORS[idx % CHART_COLORS.length],
       }));
     }
     if (doughnutMode === "expense") {
-      return (data.expenses_by_cat || []).map((c, idx) => ({
-        name: c.category || "Other",
-        value: Number(c.total || 0),
-        count: `${c.count} items`,
+      const expList = data.expenses_by_cat || data.expenses_by_category || [];
+      return expList.map((c, idx) => ({
+        name: c.category || "General",
+        value: Number(c.total ?? c.amount ?? 0),
+        count: `${c.count || 1} items`,
         color: CHART_COLORS[idx % CHART_COLORS.length],
       }));
     }
@@ -468,46 +468,51 @@ export function AdminChartsSection({
   const statusChartItems = useMemo(() => {
     if (!data) return [];
     if (statusChartMode === "sales") {
+      const completedCnt = Number(fin.orders ?? counts.completed_sales ?? 0);
+      const voidCnt = Number(fin.void_count ?? counts.voided_sales ?? 0);
       return [
         {
           name: "Completed Sales",
-          value: Number(fin.orders || 0),
-          amount: peso(fin.revenue),
+          value: completedCnt,
+          amount: peso(fin.revenue || 0),
           color: "#2fcf8a",
           filterStatus: "completed",
         },
         {
           name: "Voided Receipts",
-          value: Number(fin.void_count || 0),
-          amount: peso(fin.void_total),
+          value: voidCnt,
+          amount: peso(fin.void_total || fin.voided_total || 0),
           color: "#ff5470",
           filterStatus: "voided",
         },
       ];
     }
     if (statusChartMode === "stock") {
+      const healthyCnt = Number(counts.healthy_stock_count ?? counts.healthy_stock ?? counts.products_healthy ?? 0);
+      const lowCnt = Number(counts.low_stock_count ?? counts.low_stock ?? counts.products_low_stock ?? 0);
+      const outCnt = Number(counts.out_of_stock_count ?? counts.out_of_stock ?? counts.products_out_of_stock ?? 0);
       return [
         {
           name: "Healthy Stock",
-          value: Number(counts.healthy_stock_count || 0),
+          value: healthyCnt,
           color: "#2fcf8a",
           filterStatus: "healthy",
         },
         {
           name: "Low Stock Alert",
-          value: Number(counts.low_stock_count || 0),
+          value: lowCnt,
           color: "#f5b83d",
           filterStatus: "low",
         },
         {
           name: "Out of Stock",
-          value: Number(counts.out_of_stock_count || 0),
+          value: outCnt,
           color: "#ff5470",
           filterStatus: "out",
         },
       ];
     }
-    const shifts = data.shifts || [];
+    const shifts = data.shifts || data.shift_history || [];
     const openCnt = shifts.filter((s) => s.status === "open").length;
     const balancedCnt = shifts.filter((s) => s.status === "closed" && Math.abs(Number(s.variance || 0)) < 0.01).length;
     const overageCnt = shifts.filter((s) => s.status === "closed" && Number(s.variance || 0) >= 0.01).length;
@@ -520,50 +525,60 @@ export function AdminChartsSection({
     ];
   }, [data, statusChartMode, fin, counts]);
 
-  const comparativeItems = useMemo(() => {
+  const leaderboardItems = useMemo(() => {
     if (!data) return [];
-    if (comparativeMode === "products") {
-      const list = [...(data.product_profitability || [])];
-      list.sort((a, b) =>
-        comparativeMetric === "qty" ? b.qty - a.qty : b.revenue - a.revenue
-      );
-      return list.slice(0, 8).map((p) => ({
+    if (employeeReportView === "products") {
+      const prods = [...(data.catalog_performance || data.top_products || [])];
+      prods.sort((a, b) => Number(b.revenue || b.total || 0) - Number(a.revenue || a.total || 0));
+      return prods.slice(0, 8).map((p) => ({
+        type: "product",
+        id: p.id,
         name: p.name,
-        sub: p.category,
-        primary: comparativeMetric === "qty" ? p.qty : p.revenue,
-        secondary: p.profit,
-        formatted: comparativeMetric === "qty" ? `${p.qty} sold` : peso(p.revenue),
-        subFormatted: `Profit: ${peso(p.profit)} (${Number(p.margin_pct || 0).toFixed(1)}%)`,
+        sub: p.category || "General",
+        units: Number(p.units_sold ?? p.qty ?? 0),
+        amount: Number(p.revenue ?? p.total ?? 0),
+        profit: Number(p.gross_profit ?? p.profit ?? 0),
+        formatted: peso(p.revenue ?? p.total ?? 0),
+        subFormatted: `${Number(p.units_sold ?? p.qty ?? 0)} sold`,
         color: "#ff7a3d",
       }));
     }
-    if (comparativeMode === "employees") {
-      const list = [...(data.employee_performance || [])];
-      list.sort((a, b) =>
-        comparativeMetric === "qty" ? b.ld_drinks - a.ld_drinks : b.total_payout - a.total_payout
-      );
-      return list.slice(0, 8).map((e) => ({
-        name: e.staff_name,
-        sub: `Salary ${pesoShort(e.salary_total)} • Comm ${pesoShort(e.commission_total)} • LD ${pesoShort(e.ld_total)}`,
-        primary: comparativeMetric === "qty" ? e.ld_drinks : e.total_payout,
-        formatted: comparativeMetric === "qty" ? `${e.ld_drinks} LD drinks` : peso(e.total_payout),
-        subFormatted: `${e.ld_drinks} Ladies Drinks`,
-        color: "#a855f7",
-      }));
+
+    const rawEmps = (data.employee_performance && data.employee_performance.length > 0)
+      ? data.employee_performance.map((e) => ({
+          type: "employee",
+          name: e.staff_name,
+          salary: Number(e.salary_total || 0),
+          commission: Number(e.commission_total || 0),
+          ld_commission: Number(e.ld_total || 0),
+          ld_drinks: Number(e.ld_drinks || 0),
+          total: Number(e.total_payout || 0),
+          color: "#a855f7",
+        }))
+      : (data.top_employees || []).map((e) => ({
+          type: "employee",
+          name: e.employee_name,
+          salary: Number(e.salary || 0),
+          commission: Number(e.commission || 0),
+          ld_commission: Number(e.ld_commission || 0),
+          ld_drinks: 0,
+          total: Number(e.total || (Number(e.salary || 0) + Number(e.commission || 0) + Number(e.ld_commission || 0))),
+          color: "#a855f7",
+        }));
+
+    const sorted = [...rawEmps];
+    if (employeeReportView === "salary") {
+      sorted.sort((a, b) => b.salary - a.salary);
+    } else if (employeeReportView === "commission") {
+      sorted.sort((a, b) => b.commission - a.commission);
+    } else if (employeeReportView === "ld") {
+      sorted.sort((a, b) => (b.ld_commission || b.ld_drinks) - (a.ld_commission || a.ld_drinks));
+    } else {
+      sorted.sort((a, b) => b.total - a.total);
     }
-    const list = [...(data.by_category || [])];
-    list.sort((a, b) =>
-      comparativeMetric === "qty" ? b.qty - a.qty : b.revenue - a.revenue
-    );
-    return list.slice(0, 8).map((c) => ({
-      name: c.category || "Uncategorized",
-      sub: `${c.qty} units sold`,
-      primary: comparativeMetric === "qty" ? c.qty : c.revenue,
-      formatted: comparativeMetric === "qty" ? `${c.qty} units` : peso(c.revenue),
-      subFormatted: `Gross Profit: ${peso(c.profit)}`,
-      color: "#38bdf8",
-    }));
-  }, [data, comparativeMode, comparativeMetric]);
+
+    return sorted.slice(0, 8);
+  }, [data, employeeReportView]);
 
   if (!data) return null;
 
@@ -770,101 +785,162 @@ export function AdminChartsSection({
           />
         </div>
 
-        {/* D. Comparative Analysis Bar Chart */}
+        {/* D. Highest Income Per Employee Leaderboard */}
         <div className="card chart-card">
           <div className="chart-card-head">
             <div>
               <h3>
-                <BarChart3 size={16} color="var(--info)" /> Comparative Ranking
+                <Award size={18} color="#ffb020" /> Highest Income per Employee
               </h3>
-              <p className="muted">Compare top products, staff compensation, or categories.</p>
+              <p className="muted">
+                {employeeReportView === "products"
+                  ? "Top product performers by sales revenue and quantity."
+                  : "Ranked payroll, commission, and ladies drinks income per staff."}
+              </p>
             </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <div className="segmented-control">
+            <div className="segmented-control" style={{ flexWrap: "wrap", gap: 2 }}>
+              {[
+                { id: "all", label: "All Earnings" },
+                { id: "salary", label: "Salary" },
+                { id: "commission", label: "Commissions" },
+                { id: "ld", label: "LD Drinks" },
+                { id: "products", label: "Top Products" },
+              ].map((btn) => (
                 <button
+                  key={btn.id}
                   type="button"
-                  className={comparativeMode === "products" ? "active" : ""}
-                  onClick={() => setComparativeMode("products")}
+                  className={employeeReportView === btn.id ? "active" : ""}
+                  onClick={() => setEmployeeReportView(btn.id)}
                 >
-                  Products
+                  {btn.label}
                 </button>
-                <button
-                  type="button"
-                  className={comparativeMode === "employees" ? "active" : ""}
-                  onClick={() => setComparativeMode("employees")}
-                >
-                  Staff Pay
-                </button>
-                <button
-                  type="button"
-                  className={comparativeMode === "categories" ? "active" : ""}
-                  onClick={() => setComparativeMode("categories")}
-                >
-                  Categories
-                </button>
-              </div>
-              <div className="segmented-control">
-                <button
-                  type="button"
-                  className={comparativeMetric === "value" ? "active" : ""}
-                  onClick={() => setComparativeMetric("value")}
-                >
-                  ₱ Value
-                </button>
-                <button
-                  type="button"
-                  className={comparativeMetric === "qty" ? "active" : ""}
-                  onClick={() => setComparativeMetric("qty")}
-                >
-                  Count
-                </button>
-              </div>
+              ))}
             </div>
           </div>
 
-          {comparativeItems.length === 0 ? (
-            <Empty text="No comparative records in this period." />
+          {leaderboardItems.length === 0 ? (
+            <Empty text="No staff income or product records found for this period." />
           ) : (
-            <div className="comparative-bars">
-              {(() => {
-                const maxP = Math.max(1, ...comparativeItems.map((i) => Number(i.primary || 0)));
-                return comparativeItems.map((item, idx) => (
-                  <div
-                    key={idx}
-                    className="comp-bar-row"
-                    onClick={() => {
-                      if (comparativeMode === "products") jumpToReport("products", { search: item.name });
-                      else if (comparativeMode === "employees") jumpToReport("employees", { staff: item.name });
-                      else jumpToReport("products", { category: item.name });
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    title="Click to inspect underlying records"
-                  >
-                    <div className="comp-bar-labels">
-                      <div>
-                        <b>{idx + 1}. {item.name}</b>
-                        {item.sub && <span className="muted"> • {item.sub}</span>}
-                      </div>
-                      <div className="comp-bar-values">
-                        <b>{item.formatted}</b>
-                        <span className="muted">{item.subFormatted}</span>
-                      </div>
-                    </div>
-                    <div className="comp-bar-track">
-                      <div
-                        className="comp-bar-fill"
-                        style={{
-                          width: `${Math.min(100, (Number(item.primary || 0) / maxP) * 100)}%`,
-                          background: item.color,
+            <div className="table-wrap" style={{ maxHeight: 310, overflowY: "auto" }}>
+              <table className="data-table" style={{ fontSize: "0.85rem" }}>
+                <thead>
+                  <tr>
+                    <th style={{ width: 52 }}>Rank</th>
+                    <th>{employeeReportView === "products" ? "Product Name" : "Staff Name"}</th>
+                    {employeeReportView === "products" ? (
+                      <>
+                        <th>Category</th>
+                        <th className="num">Units Sold</th>
+                        <th className="num">Total Sales</th>
+                      </>
+                    ) : (
+                      <>
+                        {employeeReportView !== "commission" && employeeReportView !== "ld" && (
+                          <th className="num">Salary</th>
+                        )}
+                        {employeeReportView !== "salary" && employeeReportView !== "ld" && (
+                          <th className="num">Commission</th>
+                        )}
+                        {employeeReportView !== "salary" && employeeReportView !== "commission" && (
+                          <th className="num">LD Comm</th>
+                        )}
+                        <th className="num">Total Income</th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {leaderboardItems.map((item, idx) => {
+                    const isTop1 = idx === 0;
+                    const isTop2 = idx === 1;
+                    const isTop3 = idx === 2;
+                    return (
+                      <tr
+                        key={idx}
+                        className="row-hover"
+                        style={{ cursor: "pointer" }}
+                        onClick={() => {
+                          if (item.type === "product") {
+                            jumpToReport("products", { search: item.name });
+                          } else {
+                            jumpToReport("employees", { staff: item.name });
+                          }
                         }}
-                      />
-                    </div>
-                  </div>
-                ));
-              })()}
+                        title={`Click to inspect details in ${item.type === "product" ? "Products" : "Employees"} Report`}
+                      >
+                        <td>
+                          {isTop1 ? (
+                            <span className="badge" style={{ background: "rgba(255,176,32,0.2)", color: "#ffb020", fontWeight: 700 }}>
+                              🥇 1st
+                            </span>
+                          ) : isTop2 ? (
+                            <span className="badge" style={{ background: "rgba(180,180,190,0.2)", color: "var(--muted)", fontWeight: 700 }}>
+                              🥈 2nd
+                            </span>
+                          ) : isTop3 ? (
+                            <span className="badge" style={{ background: "rgba(205,127,50,0.2)", color: "#cd7f32", fontWeight: 700 }}>
+                              🥉 3rd
+                            </span>
+                          ) : (
+                            <span className="muted" style={{ fontWeight: 600 }}>#{idx + 1}</span>
+                          )}
+                        </td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                            <b>{item.name}</b>
+                            {item.sub && item.type === "product" && (
+                              <span className="muted" style={{ fontSize: 11 }}>• {item.sub}</span>
+                            )}
+                          </div>
+                        </td>
+                        {item.type === "product" ? (
+                          <>
+                            <td><StatusBadge tone="neutral" label={item.category} /></td>
+                            <td className="num"><b>{item.units}</b></td>
+                            <td className="num"><b style={{ color: "var(--accent)" }}>{item.formatted}</b></td>
+                          </>
+                        ) : (
+                          <>
+                            {employeeReportView !== "commission" && employeeReportView !== "ld" && (
+                              <td className="num muted">{peso(item.salary)}</td>
+                            )}
+                            {employeeReportView !== "salary" && employeeReportView !== "ld" && (
+                              <td className="num muted">{peso(item.commission)}</td>
+                            )}
+                            {employeeReportView !== "salary" && employeeReportView !== "commission" && (
+                              <td className="num muted">
+                                {peso(item.ld_commission)}
+                                {item.ld_drinks > 0 && (
+                                  <span className="muted" style={{ fontSize: 10, display: "block" }}>
+                                    ({item.ld_drinks} drinks)
+                                  </span>
+                                )}
+                              </td>
+                            )}
+                            <td className="num">
+                              <b style={{ color: "var(--ok)", fontSize: "0.95rem" }}>{peso(item.total)}</b>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
+
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--border)", fontSize: "0.8rem" }}>
+            <span className="muted">Click any row to jump to detailed records</span>
+            <button
+              type="button"
+              className="btn ghost sm"
+              style={{ fontSize: "0.8rem", padding: "4px 8px" }}
+              onClick={() => jumpToReport(employeeReportView === "products" ? "products" : "employees")}
+            >
+              {employeeReportView === "products" ? "Open Products Report →" : "Open Staff Payroll Report →"}
+            </button>
+          </div>
         </div>
 
         {/* E. Activity & Peak Trading Hours Tracking */}
