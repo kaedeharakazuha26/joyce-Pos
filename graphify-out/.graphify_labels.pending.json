@@ -1,5 +1,5 @@
 {
-  "0": "App",
+  "0": "PageErrorBoundary",
   "1": "package.json",
   "2": "printer.rs",
   "3": "tauri.conf.json",
@@ -7,7 +7,7 @@
   "5": "App.jsx",
   "6": "R",
   "7": "db.rs",
-  "8": "cmds.rs",
+  "8": "auth.rs",
   "9": "default.json",
   "10": "set-version.mjs",
   "11": "build.rs",
@@ -20,6 +20,10 @@
   "18": "R",
   "19": "State",
   "20": "JOYCE POS",
-  "21": "ToSql",
-  "22": "Value"
+  "21": "rows",
+  "22": "Value",
+  "23": "Db",
+  "24": "AdminModals.jsx",
+  "25": "products.rs",
+  "26": "sales.rs"
 }
