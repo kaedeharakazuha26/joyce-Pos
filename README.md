@@ -335,7 +335,7 @@ The project includes an automated multi-platform release workflow (`.github/work
 ### Official Downloads & Releases
 
 Prebuilt, production-ready desktop installers are published on GitHub Releases:
-- **Latest Release**: [JOYCE POS v1.0.0](https://github.com/kaedeharakazuha26/joyce-Pos/releases/tag/v1.0.0)
+- **Latest Release**: [JOYCE POS v1.0.1](https://github.com/kaedeharakazuha26/joyce-Pos/releases/tag/v1.0.1)
 - **Included Packages**:
   - **Linux**: `.deb` (Debian/Ubuntu/Mint), `.rpm` (Fedora/RHEL), `.AppImage` (Universal portable)
   - **Windows**: `.exe` (NSIS Installer), `.msi` (Windows Installer)
