@@ -108,9 +108,9 @@
     "semantic_hash": ""
   },
   "src/pages/POS.jsx": {
-    "mtime": 1792173782.01749,
-    "seen": 1792174316.2583113,
-    "ast_hash": "d35f4acb5b11e34ed44bf790b6600b61",
+    "mtime": 1792323360.7023172,
+    "seen": 1792323868.8311198,
+    "ast_hash": "25f609b5823a243bf18baa6afb323fc5",
     "semantic_hash": ""
   },
   "src/pages/Products.jsx": {
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "src/pages/AdminDashboard.jsx": {
-    "mtime": 1792322700.5869112,
-    "seen": 1792322722.1989322,
-    "ast_hash": "1418db897618ee15e3ad6437eeb30fda",
+    "mtime": 1792323295.0678103,
+    "seen": 1792323868.8310382,
+    "ast_hash": "8806328fb6001a1f6ad42f04ef446e41",
     "semantic_hash": ""
   },
   "src/components/admin/AdminCharts.jsx": {
@@ -390,9 +390,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/cmds/sales.rs": {
-    "mtime": 1792322126.947062,
-    "seen": 1792322722.1988962,
-    "ast_hash": "6be9bd600fd162396bd87f9d22f0dc7d",
+    "mtime": 1792323310.9089298,
+    "seen": 1792323868.830904,
+    "ast_hash": "d2098b5f4c79ea07d761afe0b2b50f16",
     "semantic_hash": ""
   },
   "src-tauri/src/cmds/shifts.rs": {

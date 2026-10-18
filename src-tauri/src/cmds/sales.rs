@@ -49,9 +49,9 @@ pub fn create_sale(db: State<Db>, items: Vec<Value>, paid: f64) -> R<Value> {
         if qty <= 0 {
             return Err("Invalid quantity".into());
         }
-        let (name, price, cost, stock): (String, f64, f64, i64) = tx
-            .query_row("SELECT name,price,cost,stock FROM products WHERE id=?", [pid], |r| {
-                Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
+        let (name, price, cost): (String, f64, f64) = tx
+            .query_row("SELECT name,price,cost FROM products WHERE id=?", [pid], |r| {
+                Ok((r.get(0)?, r.get(1)?, r.get(2)?))
             })
             .map_err(e)?;
         let (vid, vname, per, unit_price): (Option<i64>, String, i64, f64) =
@@ -67,9 +67,7 @@ pub fn create_sale(db: State<Db>, items: Vec<Value>, paid: f64) -> R<Value> {
                 None => (None, String::new(), 1, price),
             };
         let units = per * qty;
-        if stock < units {
-            return Err(format!("Not enough stock for {} (have {}, need {})", name, stock, units));
-        }
+        // Allow 0 stock sales: deduct units directly without blocking checkout
         tx.execute("UPDATE products SET stock=stock-? WHERE id=?", params![units, pid]).map_err(e)?;
         let sub = unit_price * qty as f64;
         total += sub;

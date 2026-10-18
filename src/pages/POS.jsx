@@ -30,17 +30,33 @@ export default function POS() {
   const remaining = (p) => p.stock - unitsInCart(p.id);
 
   const add = (product, variant) => {
-    const need = variant ? variant.qty : 1;
-    if (remaining(product) < need) return toast(`Not enough stock for ${product.name}`, "err");
     const key = `${product.id}-${variant?.id ?? 0}`;
     setCart((c) => (c.find((l) => l.key === key) ? c.map((l) => (l.key === key ? { ...l, quantity: l.quantity + 1 } : l)) : [...c, { key, product, variant, quantity: 1 }]));
     setPicker(null);
   };
   const step = (line, d) => {
-    if (d > 0 && remaining(line.product) < (line.variant ? line.variant.qty : 1)) return toast("No more stock", "err");
     setCart((c) => c.map((l) => (l.key === line.key ? { ...l, quantity: l.quantity + d } : l)).filter((l) => l.quantity > 0));
   };
   const click = (p) => (p.variants.length ? setPicker(p) : add(p, null));
+
+  const onSearchKeyDown = (e) => {
+    if (e.key === "Enter" && q.trim()) {
+      const match =
+        shown.find(
+          (p) =>
+            p.barcode &&
+            p.barcode.toLowerCase() === q.trim().toLowerCase()
+        ) ||
+        shown.find(
+          (p) => p.name.toLowerCase() === q.trim().toLowerCase()
+        ) ||
+        (shown.length === 1 ? shown[0] : null);
+      if (match) {
+        click(match);
+        setQ("");
+      }
+    }
+  };
 
   const price = (l) => (l.variant ? l.variant.price : l.product.price);
   const total = cart.reduce((s, l) => s + price(l) * l.quantity, 0);
@@ -70,14 +86,22 @@ export default function POS() {
         <div className="toolbar">
           <div style={{ position: "relative", flex: 1 }}>
             <Search size={16} style={{ position: "absolute", left: 12, top: 13, opacity: 0.5 }} />
-            <input id="pos-search" style={{ paddingLeft: 36 }} autoFocus placeholder="Search product or scan barcode…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <input
+              id="pos-search"
+              style={{ paddingLeft: 36 }}
+              autoFocus
+              placeholder="Search product or scan barcode…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={onSearchKeyDown}
+            />
           </div>
         </div>
         <div className="cats">{cats.map((c) => <button key={c} className={"chip" + (cat === c ? " active" : "")} onClick={() => setCat(c)}>{c}</button>)}</div>
         {shown.length === 0 ? <Empty text="No products found. Add some in the Products tab." /> : (
           <div className="products">
             {shown.map((p) => (
-              <button key={p.id} className="pcard" disabled={remaining(p) <= 0} onClick={() => click(p)}>
+              <button key={p.id} className="pcard" onClick={() => click(p)}>
                 {p.variants.length > 0 && <span className="vtag">{p.variants.length + 1} options</span>}
                 {p.image ? (
                   <img src={p.image} alt={p.name} className="pcard-img" />
@@ -86,7 +110,12 @@ export default function POS() {
                 )}
                 <span className="pname">{p.name}</span>
                 <span className="pprice">{peso(p.price)}</span>
-                <span className="pstock">{remaining(p) <= 0 ? "Out of stock" : `${remaining(p)} in stock`}</span>
+                <span
+                  className="pstock"
+                  style={remaining(p) <= 0 ? { color: "var(--warn, #f59e0b)", fontWeight: 600 } : undefined}
+                >
+                  {remaining(p)} in stock
+                </span>
               </button>
             ))}
           </div>
@@ -129,7 +158,7 @@ export default function POS() {
         <Modal title={picker.name} onClose={() => setPicker(null)}>
           <div className="variant-pick">
             {[{ id: null, name: "1 pc (regular)", qty: 1, price: picker.price }, ...picker.variants].map((v) => (
-              <button key={v.id ?? "base"} className={"vopt" + (remaining(picker) < v.qty ? " off" : "")} onClick={() => add(picker, v.id ? v : null)}>
+              <button key={v.id ?? "base"} className="vopt" onClick={() => add(picker, v.id ? v : null)}>
                 <span><b>{v.name}</b><br /><small className="muted">uses {v.qty} from stock</small></span>
                 <b>{peso(v.price)}</b>
               </button>

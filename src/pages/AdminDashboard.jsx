@@ -50,8 +50,6 @@ export function AdminDashboard(props = {}) {
   const onClearExternalCommand =
     props.onClearExternalCommand || ctx.clearAdminReportIntent;
 
-  const [showtGuide, setShowGuide] = useState(false);
-
   const ctrl = useAdminController({
     toast,
     activeBusinessDate,
