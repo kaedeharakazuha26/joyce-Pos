@@ -90,9 +90,9 @@
     "semantic_hash": ""
   },
   "src/pages/Dashboard.jsx": {
-    "mtime": 1792338373.252347,
-    "seen": 1792338591.7528079,
-    "ast_hash": "698dcaf3ce116b2253d9cb56bb9457cd",
+    "mtime": 1792342099.4554844,
+    "seen": 1792343129.0864463,
+    "ast_hash": "87715d07d3f51048b5f04b56bdabc984",
     "semantic_hash": ""
   },
   "src/pages/Expenses.jsx": {
@@ -294,9 +294,9 @@
     "semantic_hash": ""
   },
   "src/components/admin/AdminCharts.jsx": {
-    "mtime": 1792340421.600752,
-    "seen": 1792341781.3006763,
-    "ast_hash": "1b3bcfef2868d9c0474d10191ec3974a",
+    "mtime": 1792341952.798363,
+    "seen": 1792343129.0864193,
+    "ast_hash": "280e40afdf46cb2c7ad277b81025c980",
     "semantic_hash": ""
   },
   "src/components/admin/AdminKpiGrid.jsx": {

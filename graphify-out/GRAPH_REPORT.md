@@ -1,17 +1,17 @@
 # Graph Report - Joy-Pos-Multiplatform  (2026-10-19)
 
 ## Corpus Check
-- 50 files · ~148,073 words
+- 50 files · ~148,078 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .icns 1, .ico 1)
 
 ## Summary
-- 395 nodes · 1327 edges · 23 communities (14 shown, 9 thin omitted)
+- 395 nodes · 1326 edges · 22 communities (13 shown, 9 thin omitted)
 - Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 112 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `c74af4a7`
+- Built from commit: `ddd50362`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -29,7 +29,6 @@
 - set-version.mjs
 - joyce-pos
 - adminUtils.js
-- AdminModals.jsx
 - JOYCE POS
 - rows
 - Db
@@ -49,19 +48,19 @@
 ## Surprising Connections (you probably didn't know these)
 - `What is Graphify?` --references--> `ymd()`  [INFERRED]
   README.md → src/utils.js
-- `print_receipt()` --calls--> `sale_detail()`  [INFERRED]
-  src-tauri/src/cmds/printing.rs → src-tauri/src/cmds/sales.rs
-- `print_z_reading()` --calls--> `rows()`  [INFERRED]
-  src-tauri/src/cmds/printing.rs → src-tauri/src/cmds/common.rs
-- `get_shift_status()` --calls--> `rows()`  [INFERRED]
-  src-tauri/src/cmds/shifts.rs → src-tauri/src/cmds/common.rs
-- `start_day()` --calls--> `log_audit()`  [INFERRED]
-  src-tauri/src/cmds/shifts.rs → src-tauri/src/cmds/common.rs
+- `admin_dashboard()` --calls--> `active_business_date()`  [INFERRED]
+  src-tauri/src/cmds/dashboard.rs → src-tauri/src/cmds/common.rs
+- `set_storage_dir()` --calls--> `active_business_date()`  [INFERRED]
+  src-tauri/src/cmds/system.rs → src-tauri/src/cmds/common.rs
+- `sync_to_gdrive()` --calls--> `active_business_date()`  [INFERRED]
+  src-tauri/src/cmds/system.rs → src-tauri/src/cmds/common.rs
+- `void_sale()` --calls--> `business_now()`  [INFERRED]
+  src-tauri/src/cmds/sales.rs → src-tauri/src/cmds/common.rs
 
 ## Import Cycles
 - None detected.
 
-## Communities (23 total, 9 thin omitted)
+## Communities (22 total, 9 thin omitted)
 
 ### Community 1 - "package.json"
 Cohesion: 0.07
@@ -76,16 +75,16 @@ Cohesion: 0.11
 Nodes (17): app, security, windows, build, beforeBuildCommand, beforeDevCommand, devUrl, frontendDist (+9 more)
 
 ### Community 4 - "ui.jsx"
-Cohesion: 0.38
-Nodes (12): lucide-react, AdminAlertsAndActivity(), AdminKpiGrid(), AdminOverviewPnL(), TablePagination(), AdminPayrollAuditTables(), AdminReportsModule(), AdminSalesInventoryTables() (+4 more)
+Cohesion: 0.26
+Nodes (20): lucide-react, AdminChartsSection(), InteractiveDoughnutChart(), InteractiveTrendChart(), AdminAlertsAndActivity(), AdminKpiGrid(), AdminOverviewPnL(), TablePagination() (+12 more)
 
 ### Community 5 - "App.jsx"
-Cohesion: 0.20
-Nodes (34): react, api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx, useSettings(), DashboardCrudModule() (+26 more)
+Cohesion: 0.19
+Nodes (33): react, api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx, useSettings(), PinLock() (+25 more)
 
 ### Community 6 - "ymd"
-Cohesion: 0.36
-Nodes (16): RangeBar(), ToastCtx, Commission(), CommissionBase(), LDCommission(), daysAgo(), lastMonthRange(), lastWeekRange() (+8 more)
+Cohesion: 0.39
+Nodes (15): RangeBar(), ToastCtx, Dashboard(), Stat(), daysAgo(), lastMonthRange(), lastWeekRange(), monthStart() (+7 more)
 
 ### Community 7 - "db.rs"
 Cohesion: 0.14
@@ -93,19 +92,15 @@ Nodes (5): BranchConfig, BranchInfo, BranchState, init(), init_branch_state()
 
 ### Community 8 - "shifts.rs"
 Cohesion: 0.12
-Nodes (10): r2(), scalar(), admin_dashboard(), build_activity_feed(), dashboard(), end_day(), get_shift_status(), list_shifts() (+2 more)
+Nodes (10): r2(), scalar(), admin_dashboard(), build_activity_feed(), dashboard(), create_sale(), list_sales(), list_voided() (+2 more)
 
 ### Community 9 - "default.json"
 Cohesion: 0.33
 Nodes (5): description, identifier, permissions, $schema, windows
 
 ### Community 14 - "adminUtils.js"
-Cohesion: 0.25
-Nodes (13): AdminChartsSection(), InteractiveDoughnutChart(), InteractiveTrendChart(), aggregateDailySeries(), buildExcelHtml(), buildExportDataset(), CHART_COLORS, REPORT_TABS (+5 more)
-
-### Community 16 - "AdminModals.jsx"
-Cohesion: 0.60
-Nodes (4): AdminCrudModals(), EXPENSE_CATEGORIES, ConfirmModal(), Receipt()
+Cohesion: 0.27
+Nodes (11): AdminCrudModals(), buildExcelHtml(), buildExportDataset(), EXPENSE_CATEGORIES, REPORT_TABS, useAdminController(), ConfirmModal(), Receipt() (+3 more)
 
 ### Community 20 - "JOYCE POS"
 Cohesion: 0.05
