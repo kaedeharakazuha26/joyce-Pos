@@ -50,14 +50,19 @@ JOYCE POS is built to solve the real-world operational challenges of neighborhoo
 | Module | Features & Capabilities |
 | :--- | :--- |
 | **Point of Sale (POS)** | Fast barcode scanner & text search; multi-pack variant pricing; live cart calculation; cash received & change computation; instant ESC/POS receipt printing. |
-| **Product & Inventory** | Base unit stock tracking; pack-level variants (e.g., Candy 1 pc = ₱2.00, 3 pcs = ₱5.00 deducting 3 base units); low stock visual alerts; restock logs with unit cost history. |
-| **Shift Management** | Start of Day (SOD) opening float; operational tab gating; End of Day (EOD) cash count; automated expected cash calculation vs. actual cash with over/short variance tracking. |
+| **Product & Inventory** | Base unit stock tracking; pack-level variants (e.g., Candy 1 pc = ₱2.00, 3 pcs = ₱5.00 deducting 3 base units); low stock visual alerts; restock logs with unit cost history; sold variant analytics. |
+| **Shift Management & Z-Reading** | Start of Day (SOD) opening float; operational tab gating; End of Day (EOD) **Thermal Z-Reading** receipt preview & ESC/POS hardware print (`products x quantity = amount`, executive net formula `Gross - Expenses - Salaries - LD Comm - Commissions = Net`, cash drawer reconciliation & variance, dual signatures). |
 | **Transactions & Voids** | Searchable receipt history; full receipt reprint; audited Void function (automatically restores inventory to base stock and captures reason & staff name). |
-| **Admin Dashboard** | Real-time KPI grid (Gross Sales, Net Profit, Operational Expenses, Payroll, Voided Amounts, Inventory Valuation); interactive trend & doughnut charts; date range presets; CSV/Excel/Print data export. |
-| **Finance & Payroll** | Store operational expense tracking by category; employee salary disbursements; standard sales commissions and LD (electronic load / airtime) commission tracking. |
-| **Staff & Security** | Granular cashier roles and PINs; Master Admin PIN protection; immutable system audit log capturing high-risk operational actions. |
+| **Executive & Normal Dashboards** | Multi-metric trend analysis; cost breakdown doughnut charts; shift-anchored Comprehensive P&L Statements; Highest Income per employee leaderboards; daily financial ledgers; direct CRUD module for sales, expenses, salary, and commissions. |
+| **Strict Module Exclusion** | Disabling modules in Settings (Commissions, LD Commissions, Salaries, Expenses, Inventory, Employees) strictly excludes them across all KPI tiles, P&L statements, trend charts, doughnut wedges, leaderboards, daily ledgers, CSV/Excel exports, and thermal receipts. |
+| **Luxury Themes (Gold Edition)** | **Black Gold Theme** (Dark: obsidian black with rich imperial gold gradients and ambient lighting) and **White Gold Theme** (Light: warm alabaster pearl with regal satin gold accents engineered for AA contrast); instant theme toggle on login and settings. |
+| **Interactive Terminal Lock** | Modern React login screen with dynamic moving objects (interactive HTML5 gold dust particle canvas, 3D floating luxury orbs and rotating orbital rings), dual input modes (Touch Keypad & Direct Keyboard input), live branch & shift badges, and quick admin hint. |
+| **Terminal Security & Kiosk Mode** | Disabled right-click context menu (prevents inspecting elements in production) and blocked developer tool keyboard shortcuts (`F12`, `Ctrl+Shift+I`) for secure kiosk POS operation. |
+| **Finance & Payroll** | Store operational expense tracking by category; employee salary disbursements; standard sales commissions and LD (electronic load / airtime) commission tracking with shift date attribution. |
+| **Staff & Security** | Granular cashier roles and PINs; Master Admin PIN protection; immutable system audit log capturing high-risk operational actions; Admin PIN required for record deletions. |
 | **Multi-Branch Support** | Switch between distinct store branches on the fly; custom database storage directory configuration; hot branch swapping without application restarts. |
 | **Database Ops** | Live SQLite backup & restore; factory database reset with optional catalog retention. |
+| **Multiplatform Releases** | Prebuilt standalone installers for Windows (`.exe`, `.msi`), Linux (`.deb`, `.rpm`, `.AppImage`), and macOS (`.dmg`). |
 
 ---
 
@@ -125,6 +130,30 @@ Rather than relying on browser print dialogs that require user interaction and p
 - Each branch has its own dedicated SQLite database file (e.g., `joyce_pos.db`, `joyce_pos_branch2.db`).
 - Switching branches in Settings updates the active database connection in Rust's managed state without requiring an application restart.
 
+#### 5. End of Day (EOD) Thermal Z-Reading & Financial Net Formula
+To support standard thermal receipt printers for business day-closing:
+- **Product Breakdown**: Generates itemized sold quantities and total sales amount per product line (`[Product Name] x [Quantity] = [Amount]`).
+- **Executive Net Operating Profit Formula**:
+  $$\text{Net Operating Profit} = \text{Total Gross Sales} - \text{Store Expenses} - \text{Salaries} - \text{LD Commissions} - \text{Commissions}$$
+- **Cash Drawer Reconciliation**: Compares $\text{Opening Float} + \text{Cash Sales} - \text{Total Outflows}$ against physical counted cash and reports variance (`Overage` / `Shortage` / `Balanced`).
+- **Signatures**: Formats designated cashier and manager physical signing lines.
+- **Strict Disabled Module Gating**: If any overhead module is disabled in settings, it is automatically omitted from both the thermal receipt and on-screen preview without being deducted from net operating income.
+
+#### 6. Luxury Theme Engine: Black Gold & White Gold
+- **Black Gold Theme (Dark)**: Deep obsidian/charcoal background (`#0a0b10`), metallic imperial gold gradients (`linear-gradient(135deg, #f7d468 0%, #d4af37 50%, #9e7518 100%)`), warm ambient radial backdrops, and high-contrast dark text on gold buttons.
+- **White Gold Theme (Light)**: Warm alabaster pearl white (`#faf9f5`), regal satin gold accents (`#b88a28`) engineered for WCAG AA/AAA contrast, champagne hairline borders, and antique slate text.
+- **Instant Toggling**: Themes can be switched seamlessly via Settings or directly on the login screen without page reloads.
+
+#### 7. Interactive Login Experience & Moving Objects Engine
+- **Gold Particle Canvas**: High-performance HTML5 canvas simulating floating golden dust particles with soft alpha pulsing and proximity filaments that interact fluidly with cursor coordinates.
+- **3D Floating Ambient Objects**: Multi-axis floating luxury orbs and rotating concentric dashed rings provide depth and movement.
+- **Dual Unlock Modes**: Touch Keypad with scaling PIN dots and direct keyboard password input with show/hide toggle.
+- **Terminal Badges**: Displays current business branch and shift state (`Shift Open` / `Shift Closed`) on the lock screen.
+
+#### 8. Enterprise Terminal Security & Kiosk Protection
+- **Disabled Context Menu**: Right-click context menus are intercepted and disabled globally to prevent staff or customers from inspecting webview elements in store terminals.
+- **DevTools Shortcut Gating**: Developer console shortcuts (`F12`, `Ctrl+Shift+I`, `Ctrl+Shift+J`, `Ctrl+Shift+C`, `Ctrl+U`) are blocked in the frontend application layer.
+
 ---
 
 ## Project Structure
@@ -157,8 +186,9 @@ Joy-Pos-Multiplatform/
 │   │   │   ├── AdminSalesInventoryTables.jsx# Sales records, item inspection, and inventory
 │   │   │   ├── adminUtils.js               # CSV/Excel exporters, metric calculations
 │   │   │   └── useAdminController.js       # Centralized business logic & state hook for admin
-│   │   ├── PinLock.jsx          # Security modal for PIN verification (Admin & Cashier)
-│   │   └── ui.jsx               # Design system primitives (Modal, Field, Toast, Pagination)
+│   │   ├── DashboardCrudModule.jsx      # Centralized CRUD records, variant sales modal, inventory breakdown
+│   │   ├── PinLock.jsx                  # Security lockscreen with floating background bubbles, keypad & password modes
+│   │   └── ui.jsx                       # Design system primitives (Modal, Field, Toast, Pagination)
 │   ├── pages/                   # Main Application Views
 │   │   ├── AdminDashboard.jsx   # Executive reporting & administration hub
 │   │   ├── Commissions.jsx      # Standard & LD (e-load) commission management
@@ -173,8 +203,8 @@ Joy-Pos-Multiplatform/
 │   │   └── Transactions.jsx     # Sales receipts, reprint, and void history
 │   ├── api.js                   # Tauri IPC invoke wrappers
 │   ├── App.jsx                  # Root component, routing, navigation, and shift-gating
-│   ├── main.jsx                 # React DOM mount entrypoint
-│   ├── styles.css               # Vanilla CSS design tokens & responsive styles
+│   ├── main.jsx                 # React DOM mount entrypoint (disables right-click inspect & devtools)
+│   ├── styles.css               # Vanilla CSS design tokens & luxury theme variables (Black Gold, White Gold)
 │   └── utils.js                 # Currency formatting, date math, text sanitizers
 ├── src-tauri/                   # Rust Backend & Native Tauri Layer
 │   ├── src/
@@ -199,6 +229,9 @@ Joy-Pos-Multiplatform/
 | `src-tauri/src/printer.rs` | Formats sales data into raw ESC/POS binary instructions. Handles line wrapping, character alignment, and hardware communication. |
 | `src/api.js` | Typed bridge connecting React components to Tauri's native `invoke()` methods with runtime environment guards. |
 | `src/components/admin/useAdminController.js` | Custom React controller hook encapsulating date filtering, state aggregation, CRUD operations, and CSV/Excel report exports. |
+| `src/components/DashboardCrudModule.jsx` | Centralized Records & CRUD module embedded across dashboards with variant-level sales viewer and inventory performance. |
+| `src/components/PinLock.jsx` | Interactive terminal lock screen featuring floating ambient objects, touch keypad, and keyboard unlock options. |
+| `src/main.jsx` | Global frontend entrypoint with kiosk security rules disabling right-click context menus and developer tools shortcuts. |
 | `src/App.jsx` | Orchestrates top-level navigation, sidebar responsiveness, global context providers, error boundaries, and shift-gating rules. |
 
 ---
@@ -298,6 +331,15 @@ The project includes an automated multi-platform release workflow (`.github/work
    git push origin main --tags
    ```
 3. GitHub Actions will automatically compile binaries for Ubuntu, Windows, and macOS (Intel & Apple Silicon) and attach the installers to a new GitHub Release.
+
+### Official Downloads & Releases
+
+Prebuilt, production-ready desktop installers are published on GitHub Releases:
+- **Latest Release**: [JOYCE POS v1.0.0](https://github.com/kaedeharakazuha26/joyce-Pos/releases/tag/v1.0.0)
+- **Included Packages**:
+  - **Linux**: `.deb` (Debian/Ubuntu/Mint), `.rpm` (Fedora/RHEL), `.AppImage` (Universal portable)
+  - **Windows**: `.exe` (NSIS Installer), `.msi` (Windows Installer)
+  - **macOS**: `.dmg` (Universal Disk Image), `.app.tar.gz`
 
 ---
 
