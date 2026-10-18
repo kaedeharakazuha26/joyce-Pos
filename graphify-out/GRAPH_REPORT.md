@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `42c778bc`
+- Built from commit: `407d3f4a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -50,14 +50,14 @@
 ## Surprising Connections (you probably didn't know these)
 - `What is Graphify?` --references--> `ymd()`  [INFERRED]
   README.md → src/utils.js
-- `create_sale()` --calls--> `get_active_shift()`  [INFERRED]
-  src-tauri/src/cmds/sales.rs → src-tauri/src/cmds/common.rs
-- `create_sale()` --calls--> `log_audit()`  [INFERRED]
-  src-tauri/src/cmds/sales.rs → src-tauri/src/cmds/common.rs
-- `list_sales()` --calls--> `rows()`  [INFERRED]
-  src-tauri/src/cmds/sales.rs → src-tauri/src/cmds/common.rs
-- `list_voided()` --calls--> `rows()`  [INFERRED]
-  src-tauri/src/cmds/sales.rs → src-tauri/src/cmds/common.rs
+- `change_admin_pin()` --calls--> `log_audit()`  [INFERRED]
+  src-tauri/src/cmds/auth.rs → src-tauri/src/cmds/common.rs
+- `delete_cashier()` --calls--> `log_audit()`  [INFERRED]
+  src-tauri/src/cmds/auth.rs → src-tauri/src/cmds/common.rs
+- `delete_cashier()` --calls--> `rows()`  [INFERRED]
+  src-tauri/src/cmds/auth.rs → src-tauri/src/cmds/common.rs
+- `list_cashiers()` --calls--> `rows()`  [INFERRED]
+  src-tauri/src/cmds/auth.rs → src-tauri/src/cmds/common.rs
 
 ## Import Cycles
 - None detected.
