@@ -65,7 +65,7 @@ export default function Transactions() {
   return (
     <>
       <PageHeader title="Transactions" subtitle={`${completed.length} sales · ${peso(sum)}`}>
-        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} businessDate={activeBusinessDate} />
       </PageHeader>
 
       <div className="tabs">
@@ -77,14 +77,14 @@ export default function Transactions() {
         {view === "sales" ? (
           sales.length === 0 ? <Empty text="No transactions for this period" /> : (
             <table>
-              <thead><tr><th></th><th>Receipt</th><th>Date</th><th className="num">Total</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th></th><th>Receipt</th><th>Shift Date</th><th className="num">Total</th><th>Status</th><th></th></tr></thead>
               <tbody>
                 {sales.map((s) => (
                   <Fragment key={s.id}>
                     <tr className="row-hover">
                       <td style={{ width: 30 }}><button className="icon-btn" onClick={() => setOpen({ ...open, [s.id]: !open[s.id] })}>{open[s.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</button></td>
                       <td><b>{s.receipt_no}</b></td>
-                      <td className="muted">{s.created_at}</td>
+                      <td className="muted"><b>{s.business_date || s.created_at?.slice(0, 10)}</b> <small style={{ opacity: 0.7 }}>{s.created_at?.slice(11, 16)}</small></td>
                       <td className="num">{peso(s.total)}</td>
                       <td><span className={"badge" + (s.status === "voided" ? " bad" : "")}>{s.status}</span></td>
                       <td>

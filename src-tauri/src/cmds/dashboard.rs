@@ -82,7 +82,7 @@ pub fn dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
                 SELECT {com_date_expr} AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, amount AS commissions, 0.0 AS ld_commissions
                 FROM commissions WHERE {com_date_expr} BETWEEN ?1 AND ?2
                 UNION ALL
-                SELECT {ld_date_expr} AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, amount AS commissions, amount AS ld_commissions
+                SELECT {ld_date_expr} AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, 0.0 AS commissions, amount AS ld_commissions
                 FROM ld_commissions WHERE {ld_date_expr} BETWEEN ?1 AND ?2
             )
             WHERE day IS NOT NULL AND day != ''
@@ -358,7 +358,7 @@ pub fn admin_dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
                 SELECT {com_date_expr} AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, amount AS commissions, 0.0 AS ld_commissions
                 FROM commissions WHERE {com_date_expr} BETWEEN ?1 AND ?2
                 UNION ALL
-                SELECT {ld_date_expr} AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, amount AS commissions, amount AS ld_commissions
+                SELECT {ld_date_expr} AS day, 0.0 AS sales, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, 0.0 AS commissions, amount AS ld_commissions
                 FROM ld_commissions WHERE {ld_date_expr} BETWEEN ?1 AND ?2
             )
             WHERE day IS NOT NULL AND day != ''
@@ -612,7 +612,7 @@ pub fn admin_dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
                 SELECT {com_date_expr} AS day, 0.0 AS sales, 0.0 AS cogs, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, amount AS commissions, 0.0 AS ld_commissions
                 FROM commissions WHERE {com_date_expr} BETWEEN ?1 AND ?2
                 UNION ALL
-                SELECT {ld_date_expr} AS day, 0.0 AS sales, 0.0 AS cogs, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, amount AS commissions, amount AS ld_commissions
+                SELECT {ld_date_expr} AS day, 0.0 AS sales, 0.0 AS cogs, 0 AS order_count, 0.0 AS expenses, 0.0 AS salaries, 0.0 AS commissions, amount AS ld_commissions
                 FROM ld_commissions WHERE {ld_date_expr} BETWEEN ?1 AND ?2
             )
             WHERE day IS NOT NULL AND day != ''

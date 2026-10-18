@@ -321,40 +321,89 @@ export function AdminOverviewPnL({
                 </tr>
               </thead>
               <tbody>
-                {[...(data.daily || [])].reverse().map((d) => (
-                  <tr
-                    key={d.day}
-                    className="clickable-row"
-                    onClick={() => {
-                      onApplyDateRange(d.day, d.day);
-                      jumpToReport("sales");
-                    }}
-                    title={`Click to filter dashboard to ${d.day}`}
-                  >
-                    <td>
-                      <b>{d.day}</b>
-                    </td>
-                    <td className="num">{d.orders}</td>
-                    <td className="num">{peso(d.revenue)}</td>
-                    <td className="num muted">{peso(d.cogs)}</td>
-                    <td className="num">{peso(d.gross_profit)}</td>
-                    <td className="num">{peso(d.expenses)}</td>
-                    <td className="num">{peso(d.salaries)}</td>
-                    <td className="num">{peso(d.commissions)}</td>
-                    <td className="num">{peso(d.ld_commissions)}</td>
-                    <td className="num">
-                      <b
-                        style={{
-                          color:
-                            Number(d.net_profit || 0) >= 0 ? "var(--ok)" : "var(--bad)",
-                        }}
-                      >
-                        {peso(d.net_profit)}
-                      </b>
-                    </td>
-                  </tr>
-                ))}
+                {[...(data.daily || [])].reverse().map((d) => {
+                  const orders = Number(d.orders ?? d.count ?? 0);
+                  const sales = Number(d.revenue ?? d.sales ?? d.total ?? 0);
+                  const cogs = Number(d.cogs || 0);
+                  const gross = Number(d.gross_profit ?? (sales - cogs));
+                  const exp = Number(d.expenses || 0);
+                  const sal = Number(d.salaries || 0);
+                  const com = Number(d.commissions || 0);
+                  const ld = Number(d.ld_commissions || 0);
+                  const net = Number(d.net_profit ?? d.net ?? (gross - (exp + sal + com + ld)));
+                  return (
+                    <tr
+                      key={d.day || d.date}
+                      className="clickable-row"
+                      onClick={() => {
+                        onApplyDateRange(d.day || d.date, d.day || d.date);
+                        jumpToReport("sales");
+                      }}
+                      title={`Click to filter dashboard to ${d.day || d.date}`}
+                    >
+                      <td>
+                        <b>{d.day || d.date}</b>
+                      </td>
+                      <td className="num">{orders}</td>
+                      <td className="num">{peso(sales)}</td>
+                      <td className="num muted">{peso(cogs)}</td>
+                      <td className="num">{peso(gross)}</td>
+                      <td className="num">{peso(exp)}</td>
+                      <td className="num">{peso(sal)}</td>
+                      <td className="num">{peso(com)}</td>
+                      <td className="num">{peso(ld)}</td>
+                      <td className="num">
+                        <b
+                          style={{
+                            color: net >= 0 ? "var(--ok)" : "var(--bad)",
+                          }}
+                        >
+                          {peso(net)}
+                        </b>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
+              <tfoot>
+                <tr style={{ fontWeight: 700, borderTop: "2px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+                  <td>Totals for Period</td>
+                  <td className="num">
+                    {(data.daily || []).reduce((acc, d) => acc + Number(d.orders ?? d.count ?? 0), 0)}
+                  </td>
+                  <td className="num text-ok">
+                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.revenue ?? d.sales ?? d.total ?? 0), 0))}
+                  </td>
+                  <td className="num muted">
+                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.cogs || 0), 0))}
+                  </td>
+                  <td className="num text-info">
+                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.gross_profit ?? ((d.revenue ?? d.sales ?? 0) - (d.cogs || 0))), 0))}
+                  </td>
+                  <td className="num text-bad">
+                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.expenses || 0), 0))}
+                  </td>
+                  <td className="num text-bad">
+                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.salaries || 0), 0))}
+                  </td>
+                  <td className="num text-bad">
+                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.commissions || 0), 0))}
+                  </td>
+                  <td className="num text-bad">
+                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.ld_commissions || 0), 0))}
+                  </td>
+                  <td className="num">
+                    {(() => {
+                      const netTot = (data.daily || []).reduce((acc, d) => acc + Number(d.net_profit ?? d.net ?? 0), 0);
+                      return (
+                        <b style={{ color: netTot >= 0 ? "var(--ok)" : "var(--bad)", fontSize: 14 }}>
+                          {peso(netTot)}
+                        </b>
+                      );
+                    })()}
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}

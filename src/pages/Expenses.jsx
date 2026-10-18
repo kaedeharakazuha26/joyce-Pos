@@ -10,11 +10,18 @@ const blank = (date = ymd()) => ({ category: "", description: "", amount: "", da
 
 export default function Expenses() {
   const { activeBusinessDate } = useSettings();
-  const [from, setFrom] = useState(monthStart());
-  const [to, setTo] = useState(ymd());
+  const [from, setFrom] = useState(() => monthStart(activeBusinessDate));
+  const [to, setTo] = useState(() => activeBusinessDate || ymd());
   const [list, setList] = useState([]);
   const [form, setForm] = useState(null);
   const toast = useToast();
+
+  useEffect(() => {
+    if (activeBusinessDate) {
+      setTo(activeBusinessDate);
+      setFrom(monthStart(activeBusinessDate));
+    }
+  }, [activeBusinessDate]);
 
   const load = useCallback(() => api.expenses(from, to).then(setList).catch((e) => toast(errText(e), "err")), [from, to, toast]);
   useEffect(() => { load(); }, [load]);
@@ -29,17 +36,17 @@ export default function Expenses() {
   return (
     <>
       <PageHeader title="Expenses" subtitle={`Total ${peso(total)}`}>
-        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} businessDate={activeBusinessDate} />
         <button className="btn" onClick={() => setForm(blank(activeBusinessDate || ymd()))}><Plus size={16} /> Add expense</button>
       </PageHeader>
       <div className="card">
         {list.length === 0 ? <Empty text="No expenses recorded" /> : (
           <table>
-            <thead><tr><th>Date</th><th>Category</th><th>Description</th><th className="num">Amount</th><th></th></tr></thead>
+            <thead><tr><th>Shift Date</th><th>Category</th><th>Description</th><th className="num">Amount</th><th></th></tr></thead>
             <tbody>
               {list.map((x) => (
                 <tr key={x.id} className="row-hover">
-                  <td className="muted">{x.date}</td><td><span className="badge warn">{x.category || "General"}</span></td><td>{x.description}</td>
+                  <td className="muted"><b>{x.business_date || x.date}</b></td><td><span className="badge warn">{x.category || "General"}</span></td><td>{x.description}</td>
                   <td className="num">{peso(x.amount)}</td>
                   <td><div className="actions">
                     <button className="icon-btn" onClick={() => setForm({ ...x })}><Pencil size={16} /></button>

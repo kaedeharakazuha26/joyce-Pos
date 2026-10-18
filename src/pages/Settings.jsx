@@ -568,6 +568,46 @@ export default function Settings() {
             </table>
           </div>
 
+          {/* Dedicated Admin Dashboard Toggle Card */}
+          <div className="card" style={{ marginBottom: 20 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <ShieldCheck size={22} color="var(--accent)" />
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 16 }}>Admin Dashboard Access</h3>
+                  <p className="muted" style={{ margin: "4px 0 0", fontSize: 13 }}>
+                    Enable or disable the separate executive Admin Dashboard. When disabled, the sidebar button is hidden and store reporting is consolidated into the standard Dashboard.
+                  </p>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                {(() => {
+                  let disabledList = [];
+                  try {
+                    disabledList = s.disabled_menus ? JSON.parse(s.disabled_menus) : [];
+                  } catch {
+                    disabledList = [];
+                  }
+                  const isDis = disabledList.includes("admin-dashboard");
+                  return (
+                    <>
+                      <span className={`badge ${!isDis ? "tone-ok" : "tone-warn"}`} style={{ fontSize: 12, fontWeight: 600 }}>
+                        {!isDis ? "Active / Enabled" : "Disabled / Hidden"}
+                      </span>
+                      <button
+                        type="button"
+                        className={`btn sm ${!isDis ? "danger" : "primary"}`}
+                        onClick={() => toggleBranchMenu("admin-dashboard")}
+                      >
+                        {!isDis ? "Disable Admin Dashboard" : "Enable Admin Dashboard"}
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+
           {/* Branch Menu & Reporting Configuration Card */}
           <div className="card">
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -585,6 +625,7 @@ export default function Settings() {
 
             <div className="perm-grid">
               {[
+                { id: "admin-dashboard", label: "Admin Dashboard", desc: "Executive analytics, deep reports & admin controls" },
                 { id: "expenses", label: "Expenses", desc: "Store expenses logging & deductions" },
                 { id: "salary", label: "Salary", desc: "Employee salary payouts & payroll" },
                 { id: "commission", label: "Commission", desc: "Flat employee commission tracking" },

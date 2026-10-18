@@ -15,14 +15,21 @@ function CommissionBase({ kind }) {
   const { activeBusinessDate } = useSettings();
   const isLd = kind === "ld";
   const title = isLd ? "LD Commission" : "Commission";
-  const [from, setFrom] = useState(monthStart());
-  const [to, setTo] = useState(ymd());
+  const [from, setFrom] = useState(() => monthStart(activeBusinessDate));
+  const [to, setTo] = useState(() => activeBusinessDate || ymd());
   const [list, setList] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [types, setTypes] = useState([]);
   const [form, setForm] = useState(null);
   const [newType, setNewType] = useState(null); // string while the "+" modal is open
   const toast = useToast();
+
+  useEffect(() => {
+    if (activeBusinessDate) {
+      setTo(activeBusinessDate);
+      setFrom(monthStart(activeBusinessDate));
+    }
+  }, [activeBusinessDate]);
 
   const load = useCallback(() => {
     (isLd ? api.ldCommissions(from, to) : api.commissions(from, to))
@@ -115,7 +122,7 @@ function CommissionBase({ kind }) {
   return (
     <>
       <PageHeader title={title} subtitle={`Total ${peso(total)}`}>
-        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} businessDate={activeBusinessDate} />
         <button className="btn" onClick={open}>
           <Plus size={16} /> Add {title.toLowerCase()}
         </button>
@@ -128,7 +135,7 @@ function CommissionBase({ kind }) {
           <table>
             <thead>
               <tr>
-                <th>Date</th>
+                <th>Shift Date</th>
                 <th>Name</th>
                 {!isLd && <th>Type</th>}
                 {isLd && <th className="num">Quantity</th>}
@@ -139,7 +146,7 @@ function CommissionBase({ kind }) {
             <tbody>
               {list.map((x) => (
                 <tr key={x.id} className="row-hover">
-                  <td className="muted">{x.date}</td>
+                  <td className="muted"><b>{x.business_date || x.date}</b></td>
                   <td><b>{x.employee_name}</b></td>
                   {!isLd && <td><span className="badge warn">{x.type}</span></td>}
                   {isLd && <td className="num">{x.quantity ?? 1}</td>}

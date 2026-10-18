@@ -9,12 +9,19 @@ const blank = (date = ymd()) => ({ employee: "", amount: "", date, note: "" });
 
 export default function Salary() {
   const { activeBusinessDate } = useSettings();
-  const [from, setFrom] = useState(monthStart());
-  const [to, setTo] = useState(ymd());
+  const [from, setFrom] = useState(() => monthStart(activeBusinessDate));
+  const [to, setTo] = useState(() => activeBusinessDate || ymd());
   const [list, setList] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [form, setForm] = useState(null);
   const toast = useToast();
+
+  useEffect(() => {
+    if (activeBusinessDate) {
+      setTo(activeBusinessDate);
+      setFrom(monthStart(activeBusinessDate));
+    }
+  }, [activeBusinessDate]);
 
   const load = useCallback(() => {
     api.salaries(from, to).then(setList).catch((e) => toast(errText(e), "err"));
@@ -61,7 +68,7 @@ export default function Salary() {
   return (
     <>
       <PageHeader title="Salary" subtitle={`Total paid ${peso(total)}`}>
-        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} businessDate={activeBusinessDate} />
         <button className="btn" onClick={() => setForm(blank(activeBusinessDate || ymd()))}>
           <Plus size={16} /> Record salary
         </button>
@@ -73,7 +80,7 @@ export default function Salary() {
           <table>
             <thead>
               <tr>
-                <th>Date</th>
+                <th>Shift Date</th>
                 <th>Employee</th>
                 <th>Note</th>
                 <th className="num">Amount</th>
@@ -83,7 +90,7 @@ export default function Salary() {
             <tbody>
               {list.map((x) => (
                 <tr key={x.id} className="row-hover">
-                  <td className="muted">{x.date}</td>
+                  <td className="muted"><b>{x.business_date || x.date}</b></td>
                   <td><b>{x.employee}</b></td>
                   <td>{x.note}</td>
                   <td className="num">{peso(x.amount)}</td>

@@ -60,7 +60,7 @@ export function AdminSalesInventoryTables({
                       Receipt No {renderSortIcon("receipt_no")}
                     </th>
                     <th onClick={() => toggleSort("created_at")} className="sortable">
-                      Date & Time {renderSortIcon("created_at")}
+                      Shift Date & Time {renderSortIcon("created_at")}
                     </th>
                     <th>Items Purchased</th>
                     <th onClick={() => toggleSort("total")} className="sortable num">
@@ -78,7 +78,10 @@ export function AdminSalesInventoryTables({
                   {paged.map((s) => (
                     <tr key={s.id} className={s.status === "voided" ? "row-voided" : ""}>
                       <td><b>{s.receipt_no}</b></td>
-                      <td>{s.created_at}</td>
+                      <td>
+                        <b>{s.business_date || s.created_at?.slice(0, 10)}</b>{" "}
+                        <small className="muted">{s.created_at?.slice(11, 16)}</small>
+                      </td>
                       <td className="items-cell">
                         {(s.items || [])
                           .map((i) => `${i.quantity}× ${i.name}${i.variant_name ? ` (${i.variant_name})` : ""}`)

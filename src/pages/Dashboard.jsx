@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Award,
   TrendingUp,
@@ -16,12 +16,15 @@ import {
   Printer,
   Table as TableIcon,
   BarChart3,
+  LineChart,
   Calendar,
 } from "lucide-react";
 import { api } from "../api";
 import { PageHeader, RangeBar, Empty, Modal, useToast } from "../components/ui";
 import { useSettings } from "../App";
 import { daysAgo, errText, peso, ymd } from "../utils";
+import DashboardCrudModule from "../components/DashboardCrudModule";
+import { InteractiveTrendChart } from "../components/admin/AdminCharts";
 
 const Stat = ({ label, value, sub, color, icon: Icon }) => (
   <div className="card stat" style={{ "--c": color }}>
@@ -39,13 +42,25 @@ const Stat = ({ label, value, sub, color, icon: Icon }) => (
 );
 
 export default function Dashboard() {
-  const { settings, branchInfo, activeBusinessDate, shiftStatus } = useSettings();
+  const { settings, branchInfo, activeBusinessDate, shiftStatus, currentUser } = useSettings();
   const [from, setFrom] = useState(() => daysAgo(6, activeBusinessDate));
   const [to, setTo] = useState(() => activeBusinessDate || ymd());
   const [d, setD] = useState(null);
-  const [trendView, setTrendView] = useState("chart"); // "chart" | "table"
+  const [trendView, setTrendView] = useState("line"); // "line" | "bar" | "table"
+  const [seriesEnabled, setSeriesEnabled] = useState({
+    sales: true,
+    expenses: true,
+    salaries: true,
+    commissions: true,
+    ld_commissions: true,
+    net: true,
+  });
   const [showPdfModal, setShowPdfModal] = useState(false);
   const toast = useToast();
+
+  const toggleSeries = (key) => {
+    setSeriesEnabled((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
     if (activeBusinessDate && to !== activeBusinessDate && to === ymd()) {
@@ -61,8 +76,6 @@ export default function Dashboard() {
   }, [from, to, toast]);
 
   useEffect(load, [load]);
-
-  if (!d) return <PageHeader title="Dashboard" subtitle="Loading metrics…" />;
 
   // Parse disabled menus for this branch to exclude them from reporting
   const disabledMenus = settings?.disabled_menus
@@ -81,6 +94,60 @@ export default function Dashboard() {
   const showLdCommission = !disabledMenus.includes("ld-commission");
   const showPayroll = showSalary || showCommission || showLdCommission;
   const showInventory = !disabledMenus.includes("inventory");
+
+  // Normalized chart data with all report lines for the multi-line chart (always called unconditionally)
+  const chartDailyData = useMemo(() => {
+    return (d?.daily || []).map((x) => {
+      const s = Number(x.total ?? x.sales ?? x.revenue ?? 0);
+      const exp = showExpenses ? Number(x.expenses || 0) : 0;
+      const sal = showSalary ? Number(x.salaries || 0) : 0;
+      const com = showCommission ? Number(x.commissions || 0) : 0;
+      const ld = showLdCommission ? Number(x.ld_commissions || 0) : 0;
+      const ovh = exp + sal + com + ld;
+      const net = s - ovh;
+      return {
+        ...x,
+        key: x.day,
+        label: x.day ? x.day.slice(5) : "",
+        day: x.day,
+        revenue: s,
+        sales: s,
+        total: s,
+        expenses: exp,
+        salaries: sal,
+        commissions: com,
+        ld_commissions: ld,
+        overheads: ovh,
+        net: net,
+        net_profit: net,
+      };
+    });
+  }, [d?.daily, showExpenses, showSalary, showCommission, showLdCommission]);
+
+  const seriesConfig = useMemo(
+    () => [
+      { key: "sales", label: "Sales Revenue", color: "var(--accent, #ff7a3d)", enabled: seriesEnabled.sales },
+      ...(showExpenses ? [{ key: "expenses", label: "Store Expenses", color: "#f97316", enabled: seriesEnabled.expenses }] : []),
+      ...(showSalary ? [{ key: "salaries", label: "Salaries", color: "#38bdf8", enabled: seriesEnabled.salaries }] : []),
+      ...(showCommission ? [{ key: "commissions", label: "Commissions", color: "#a855f7", enabled: seriesEnabled.commissions }] : []),
+      ...(showLdCommission ? [{ key: "ld_commissions", label: "LD Commissions", color: "#06b6d4", enabled: seriesEnabled.ld_commissions }] : []),
+      { key: "net", label: "Net Profit", color: "#2fcf8a", enabled: seriesEnabled.net },
+    ],
+    [seriesEnabled, showExpenses, showSalary, showCommission, showLdCommission]
+  );
+
+  if (!d) {
+    return (
+      <>
+        <PageHeader title="Dashboard" subtitle="Loading metrics…">
+          <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} businessDate={activeBusinessDate} />
+        </PageHeader>
+        <div style={{ padding: "60px 20px", textAlign: "center", color: "var(--text-muted, #8e95a5)" }}>
+          Loading dashboard metrics…
+        </div>
+      </>
+    );
+  }
 
   // Filtered calculations based on active modules
   const activeExpenses = showExpenses ? Number(d.expenses || 0) : 0;
@@ -102,7 +169,6 @@ export default function Dashboard() {
     };
 
   const dailyList = d.daily || [];
-  const maxSales = Math.max(1, ...dailyList.map((x) => Number(x.total || 0)));
 
   const handlePrintPdf = () => {
     window.print();
@@ -259,7 +325,80 @@ export default function Dashboard() {
         )}
       </section>
 
-      {/* ── Sales Trend (Calculations for expenses, ld commission, commission, and salary base on date selected) ── */}
+      {/* ── Comprehensive Profit & Loss (P&L) Statement ── */}
+      <section className="card pnl-statement-box" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 12, marginBottom: 14 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <TrendingUp size={20} color="var(--accent)" />
+              <h3 style={{ margin: 0 }}>Comprehensive Profit & Loss (P&L) Statement</h3>
+            </div>
+            <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
+              Shift-grounded executive financial statement for <b>{activeBranch.name}</b> ({from} → {to})
+            </p>
+          </div>
+          <span className={`badge ${computedNetProfit >= 0 ? "tone-ok" : "tone-bad"}`} style={{ fontSize: 13, fontWeight: 700, padding: "6px 12px" }}>
+            {computedNetProfit >= 0 ? "PROFITABLE" : "OPERATING LOSS"}: {peso(computedNetProfit)} ({profitMargin}% margin)
+          </span>
+        </div>
+
+        <div className="pnl-table">
+          <div className="pnl-row">
+            <span>Gross Sales Revenue ({d.orders || 0} completed orders)</span>
+            <b className="text-ok">{peso(d.revenue)}</b>
+          </div>
+          <div className="pnl-row sub">
+            <span>Less: Cost of Goods Sold (COGS)</span>
+            <b className="text-bad">−{peso(d.cogs || 0)}</b>
+          </div>
+          <div className="pnl-row highlight">
+            <b>Gross Operating Profit ({d.revenue > 0 ? (((d.gross_profit || 0) / d.revenue) * 100).toFixed(1) : 0}% margin)</b>
+            <b className="text-info">{peso(d.gross_profit || 0)}</b>
+          </div>
+
+          <div className="pnl-section-label">Operating Overheads & Payroll</div>
+          {showExpenses && (
+            <div className="pnl-row">
+              <span>Store Operating Expenses</span>
+              <b className="text-bad">−{peso(activeExpenses)}</b>
+            </div>
+          )}
+          {showSalary && (
+            <div className="pnl-row">
+              <span>Employee Salaries Payroll</span>
+              <b className="text-bad">−{peso(activeSalary)}</b>
+            </div>
+          )}
+          {showCommission && (
+            <div className="pnl-row">
+              <span>Regular Employee Commissions</span>
+              <b className="text-bad">−{peso(activeCommission)}</b>
+            </div>
+          )}
+          {showLdCommission && (
+            <div className="pnl-row">
+              <span>Ladies Drink (LD) Commissions</span>
+              <b className="text-bad">−{peso(activeLdCommission)}</b>
+            </div>
+          )}
+          <div className="pnl-row sub">
+            <b>Total Operating Overheads</b>
+            <b className="text-bad">−{peso(totalOverheads)}</b>
+          </div>
+
+          <div className={`pnl-row total ${computedNetProfit >= 0 ? "positive" : "negative"}`}>
+            <div>
+              <b>Net Operating Income / Profit</b>
+              <div style={{ fontSize: 11, fontWeight: 400 }} className="muted">
+                Net Profit Margin: {profitMargin}% • Based on active shift business dates
+              </div>
+            </div>
+            <b style={{ fontSize: 18 }}>{peso(computedNetProfit)}</b>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Multi-Line Sales & Overheads Trend ── */}
       <section className="card" style={{ marginBottom: 20 }}>
         <div
           style={{
@@ -277,19 +416,29 @@ export default function Dashboard() {
               <h3 style={{ margin: 0 }}>Sales & Overheads Trend</h3>
             </div>
             <p className="muted" style={{ fontSize: 13, marginTop: 4 }}>
-              Daily breakdown of Sales, Expenses, Salaries, and Commissions for <b>{from}</b> to <b>{to}</b>
+              Multi-metric trend comparison showing all operational curves for <b>{from}</b> to <b>{to}</b>
             </p>
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <button
-              className={`chip ${trendView === "chart" ? "active" : ""}`}
-              onClick={() => setTrendView("chart")}
-              title="Chart visualization"
+              type="button"
+              className={`chip ${trendView === "line" ? "active" : ""}`}
+              onClick={() => setTrendView("line")}
+              title="Multi-line chart of all report series"
             >
-              <BarChart3 size={14} /> Chart View
+              <LineChart size={14} /> Multi-Line
             </button>
             <button
+              type="button"
+              className={`chip ${trendView === "bar" ? "active" : ""}`}
+              onClick={() => setTrendView("bar")}
+              title="Multi-metric grouped bars"
+            >
+              <BarChart3 size={14} /> Grouped Bars
+            </button>
+            <button
+              type="button"
               className={`chip ${trendView === "table" ? "active" : ""}`}
               onClick={() => setTrendView("table")}
               title="Daily data table"
@@ -301,87 +450,59 @@ export default function Dashboard() {
 
         {dailyList.length === 0 ? (
           <Empty text="No activity recorded in this date range" />
-        ) : trendView === "chart" ? (
+        ) : trendView === "line" || trendView === "bar" ? (
           <div>
-            {/* Visual multi-metric bars */}
-            <div className="bars" style={{ minHeight: 180, alignItems: "flex-end", gap: 10 }}>
-              {dailyList.map((x) => {
-                const daySales = Number(x.total || 0);
-                const dayExp = showExpenses ? Number(x.expenses || 0) : 0;
-                const daySal = showSalary ? Number(x.salaries || 0) : 0;
-                const dayCom = showCommission ? Number(x.commissions || 0) : 0;
-                const dayLd = showLdCommission ? Number(x.ld_commissions || 0) : 0;
-                const dayOverheads = dayExp + daySal + dayCom + dayLd;
-                const dayNet = daySales - dayOverheads;
+            <InteractiveTrendChart
+              data={chartDailyData}
+              mode={trendView}
+              showComparison={false}
+              seriesConfig={seriesConfig}
+            />
 
-                const tipText = `${x.day}\nSales: ${peso(daySales)} (${x.count} orders)\nExpenses: ${peso(dayExp)}\nSalaries: ${peso(daySal)}\nCommissions: ${peso(dayCom)}\nLD Comm: ${peso(dayLd)}\nNet: ${peso(dayNet)}`;
-
-                return (
-                  <div className="bar-col" key={x.day} style={{ flex: 1, minWidth: 42 }}>
-                    <div
-                      className="bar"
-                      style={{
-                        height: `${Math.max(8, (daySales / maxSales) * 100)}%`,
-                        background:
-                          dayNet >= 0
-                            ? "var(--grad)"
-                            : "linear-gradient(180deg, #ff5470, #c41e3a)",
-                      }}
-                      data-tip={tipText}
-                    />
-                    <small style={{ fontSize: 11, marginTop: 6, fontWeight: 500 }}>
-                      {x.day.slice(5)}
-                    </small>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Legend */}
+            {/* Interactive series toggle controls */}
             <div
               style={{
                 display: "flex",
                 flexWrap: "wrap",
-                gap: 16,
+                gap: 10,
                 marginTop: 18,
                 paddingTop: 12,
                 borderTop: "1px solid var(--border)",
                 fontSize: 12,
-                color: "var(--muted)",
+                alignItems: "center",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--accent)" }} />
-                <span>Sales Revenue</span>
-              </div>
-              {showExpenses && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: "#f97316" }} />
-                  <span>Expenses</span>
-                </div>
-              )}
-              {showSalary && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: "#38bdf8" }} />
-                  <span>Salaries</span>
-                </div>
-              )}
-              {showCommission && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: "#a855f7" }} />
-                  <span>Commissions</span>
-                </div>
-              )}
-              {showLdCommission && (
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 10, height: 10, borderRadius: 2, background: "#06b6d4" }} />
-                  <span>LD Commissions</span>
-                </div>
-              )}
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ width: 10, height: 10, borderRadius: 2, background: "var(--bad)" }} />
-                <span>Negative Net Day</span>
-              </div>
+              <span className="muted" style={{ fontWeight: 600, marginRight: 4 }}>
+                Toggle Lines:
+              </span>
+              {seriesConfig.map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  className={`chip sm ${s.enabled ? "active" : ""}`}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    cursor: "pointer",
+                    opacity: s.enabled ? 1 : 0.45,
+                    border: s.enabled ? `1px solid ${s.color}` : "1px solid var(--border)",
+                  }}
+                  onClick={() => toggleSeries(s.key)}
+                  title={`Toggle ${s.label} line`}
+                >
+                  <span
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      background: s.color,
+                      display: "inline-block",
+                    }}
+                  />
+                  <span>{s.label}</span>
+                </button>
+              ))}
             </div>
           </div>
         ) : (
@@ -401,7 +522,7 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {dailyList.map((x) => {
-                  const daySales = Number(x.total || 0);
+                  const daySales = Number(x.total ?? x.sales ?? x.revenue ?? 0);
                   const dayExp = showExpenses ? Number(x.expenses || 0) : 0;
                   const daySal = showSalary ? Number(x.salaries || 0) : 0;
                   const dayCom = showCommission ? Number(x.commissions || 0) : 0;
@@ -411,7 +532,7 @@ export default function Dashboard() {
                   return (
                     <tr key={x.day} className="row-hover">
                       <td><b>{x.day}</b></td>
-                      <td className="num">{x.count}</td>
+                      <td className="num">{x.orders ?? x.count ?? 0}</td>
                       <td className="num" style={{ fontWeight: 600, color: "var(--accent)" }}>
                         {peso(daySales)}
                       </td>
@@ -625,6 +746,16 @@ export default function Dashboard() {
           )}
         </div>
       </section>
+
+      {/* ── Operational Records CRUD Module (Sales, Expenses, Salary, Commissions) ── */}
+      <DashboardCrudModule
+        from={from}
+        to={to}
+        activeBusinessDate={activeBusinessDate}
+        currentUser={currentUser}
+        settings={settings}
+        onDataChanged={load}
+      />
 
       {/* ── PDF Export / Print Preview Modal for Highest Income Per Employee ── */}
       {showPdfModal && (

@@ -75,9 +75,19 @@ export function AdminReportsModule({
   onApplyDateRange,
   loadAll,
   toast,
+  visibleTabs = {},
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
+  const availableTabs = REPORT_TABS.filter(
+    (t) => !visibleTabs || visibleTabs[`tab_${t.id}`] !== false
+  );
+
+  useEffect(() => {
+    if (visibleTabs && availableTabs.length > 0 && !availableTabs.some((t) => t.id === reportTab)) {
+      setReportTab(availableTabs[0].id);
+    }
+  }, [visibleTabs, availableTabs, reportTab, setReportTab]);
   const [sortConfig, setSortConfig] = useState({ key: "", dir: "desc" });
 
   useEffect(() => {
@@ -290,7 +300,7 @@ export function AdminReportsModule({
 
         {/* Report Category Tabs */}
         <div className="report-tabs-nav no-print" role="tablist">
-          {REPORT_TABS.map((t) => {
+          {availableTabs.map((t) => {
             const Icon = t.icon;
             let countBadge = null;
             if (t.id === "sales") countBadge = filteredSales.length;

@@ -321,7 +321,12 @@ export default function App() {
     sessionStorage.setItem("joyce-user", JSON.stringify(user));
     setCurrentUser(user);
     if (user.role === "admin") {
-      setTab("admin-dashboard");
+      let isDis = false;
+      try {
+        const d = settings?.disabled_menus ? JSON.parse(settings.disabled_menus) : [];
+        isDis = d.includes("admin-dashboard");
+      } catch {}
+      setTab(isDis ? "dashboard" : "admin-dashboard");
     }
   };
 
@@ -353,7 +358,7 @@ export default function App() {
         ...filters,
         ts: Date.now(),
       });
-      if (currentUser?.role === "admin") {
+      if (currentUser?.role === "admin" && !disabledMenus.includes("admin-dashboard")) {
         setTab("admin-dashboard");
       } else {
         // Fallback for non-admin users to corresponding operational module
@@ -499,7 +504,7 @@ export default function App() {
   const allowedNav = NAV.filter((item) => {
     if (!currentUser) return false;
     if (item.adminOnly && currentUser.role !== "admin") return false;
-    if (!["admin-dashboard", "dashboard", "pos", "transactions", "products", "settings"].includes(item.id)) {
+    if (!["dashboard", "pos", "transactions", "products", "settings"].includes(item.id)) {
       if (disabledMenus.includes(item.id)) return false;
     }
     if (currentUser.role === "admin") return true;
@@ -1227,7 +1232,7 @@ export default function App() {
                           </div>
                         </div>
                         <div className="dropdown-body">
-                          {currentUser.role === "admin" && (
+                          {currentUser.role === "admin" && !disabledMenus.includes("admin-dashboard") && (
                             <button
                               type="button"
                               className="dropdown-action-item"
@@ -1300,7 +1305,7 @@ export default function App() {
                       <button
                         type="button"
                         className="btn ghost"
-                        onClick={() => setTab(currentUser.role === "admin" ? "admin-dashboard" : "dashboard")}
+                        onClick={() => setTab(currentUser.role === "admin" && !disabledMenus.includes("admin-dashboard") ? "admin-dashboard" : "dashboard")}
                       >
                         View Reports Dashboard
                       </button>

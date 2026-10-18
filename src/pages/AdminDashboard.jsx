@@ -15,10 +15,14 @@ import {
   HelpCircle,
   BookOpen,
   ShieldCheck,
+  SlidersHorizontal,
+  Eye,
+  EyeOff,
+  LayoutGrid,
 } from "lucide-react";
-import { DATE_PRESETS, peso } from "../utils";
+import { DATE_PRESETS, peso, ymd } from "../utils";
 import { useSettings } from "../App";
-import { useToast } from "../components/ui";
+import { Modal, useToast } from "../components/ui";
 import { REPORT_TABS } from "../components/admin/adminUtils";
 import { useAdminController } from "../components/admin/useAdminController";
 import {
@@ -28,6 +32,37 @@ import {
 import { AdminChartsSection } from "../components/admin/AdminCharts";
 import { AdminReportsModule } from "../components/admin/AdminReportsModule";
 import { AdminCrudModals } from "../components/admin/AdminModals";
+
+const DEFAULT_VISIBILITY = {
+  sections: {
+    kpi_grid: true,
+    alerts_activity: true,
+    charts: true,
+    reports: true,
+  },
+  tiles: {
+    tile_sales: true,
+    tile_gross: true,
+    tile_expenses: true,
+    tile_net: true,
+    tile_today: true,
+    tile_mtd: true,
+    tile_stock: true,
+    tile_voided: true,
+  },
+  tabs: {
+    tab_overview: true,
+    tab_sales: true,
+    tab_products: true,
+    tab_expenses: true,
+    tab_salaries: true,
+    tab_commissions: true,
+    "tab_ld-commissions": true,
+    tab_employees: true,
+    tab_shifts: true,
+    tab_audit: true,
+  },
+};
 
 /**
  * Modern Executive Admin Dashboard, Reporting, Analytics & Full CRUD System
@@ -49,6 +84,45 @@ export function AdminDashboard(props = {}) {
   const externalCommand = props.externalCommand || ctx.adminReportIntent;
   const onClearExternalCommand =
     props.onClearExternalCommand || ctx.clearAdminReportIntent;
+
+  const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [visibility, setVisibility] = useState(() => {
+    try {
+      const raw = localStorage.getItem("joy_pos_admin_dashboard_visibility");
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          sections: { ...DEFAULT_VISIBILITY.sections, ...(parsed.sections || {}) },
+          tiles: { ...DEFAULT_VISIBILITY.tiles, ...(parsed.tiles || {}) },
+          tabs: { ...DEFAULT_VISIBILITY.tabs, ...(parsed.tabs || {}) },
+        };
+      }
+    } catch (e) {}
+    return DEFAULT_VISIBILITY;
+  });
+
+  const toggleVisibility = (group, key) => {
+    setVisibility((prev) => {
+      const next = {
+        ...prev,
+        [group]: {
+          ...prev[group],
+          [key]: !prev[group][key],
+        },
+      };
+      try {
+        localStorage.setItem("joy_pos_admin_dashboard_visibility", JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  };
+
+  const resetVisibility = () => {
+    setVisibility(DEFAULT_VISIBILITY);
+    try {
+      localStorage.removeItem("joy_pos_admin_dashboard_visibility");
+    } catch (e) {}
+  };
 
   const ctrl = useAdminController({
     toast,
@@ -305,7 +379,14 @@ export function AdminDashboard(props = {}) {
           </div>
 
           <div className="admin-export-actions">
-
+            <button
+              type="button"
+              className="btn ghost sm"
+              onClick={() => setShowCustomizeModal(true)}
+              title="Show or hide dashboard tiles, sections, and reports"
+            >
+              <SlidersHorizontal size={14} /> Customize View
+            </button>
             <button
               type="button"
               className="btn ghost sm"
@@ -418,87 +499,97 @@ export function AdminDashboard(props = {}) {
       {/* 3. Main Dashboard Content */}
       {data && (
         <>
-          <AdminKpiGrid
-            loading={loading}
-            data={data}
-            activeBusinessDate={activeBusinessDate}
-            handleApplyDateRange={handleApplyDateRange}
-            jumpToReport={jumpToReport}
-          />
+          {visibility.sections?.kpi_grid !== false && (
+            <AdminKpiGrid
+              loading={loading}
+              data={data}
+              activeBusinessDate={activeBusinessDate}
+              handleApplyDateRange={handleApplyDateRange}
+              jumpToReport={jumpToReport}
+              visibleTiles={visibility.tiles}
+            />
+          )}
 
-          <AdminAlertsAndActivity
-            data={data}
-            auditLogs={auditLogs}
-            openSod={openSod}
-            jumpToReport={jumpToReport}
-            onInspectAudit={(item) => setViewingAuditItem(item)}
-          />
+          {visibility.sections?.alerts_activity !== false && (
+            <AdminAlertsAndActivity
+              data={data}
+              auditLogs={auditLogs}
+              openSod={openSod}
+              jumpToReport={jumpToReport}
+              onInspectAudit={(item) => setViewingAuditItem(item)}
+            />
+          )}
 
-          <AdminChartsSection
-            data={data}
-            from={from}
-            to={to}
-            categoryFilter={categoryFilter}
-            setCategoryFilter={setCategoryFilter}
-            jumpToReport={jumpToReport}
-          />
+          {visibility.sections?.charts !== false && (
+            <AdminChartsSection
+              data={data}
+              from={from}
+              to={to}
+              categoryFilter={categoryFilter}
+              setCategoryFilter={setCategoryFilter}
+              jumpToReport={jumpToReport}
+            />
+          )}
 
-          <AdminReportsModule
-            reportSectionRef={reportSectionRef}
-            reportTab={reportTab}
-            setReportTab={setReportTab}
-            from={from}
-            to={to}
-            search={search}
-            setSearch={setSearch}
-            categoryFilter={categoryFilter}
-            setCategoryFilter={setCategoryFilter}
-            statusFilter={statusFilter}
-            setStatusFilter={setStatusFilter}
-            staffFilter={staffFilter}
-            setStaffFilter={setStaffFilter}
-            allProductCategories={allProductCategories}
-            allStaffNames={allStaffNames}
-            commissionTypes={commissionTypes}
-            employeesList={employeesList}
-            selectedIds={selectedIds}
-            setSelectedIds={setSelectedIds}
-            handleBulkDelete={handleBulkDelete}
-            setEditingProduct={setEditingProduct}
-            setRestockModal={setRestockModal}
-            setEditingExpense={setEditingExpense}
-            setEditingSalary={setEditingSalary}
-            setEditingCommission={setEditingCommission}
-            setEditingLdCommission={setEditingLdCommission}
-            setEditingEmployee={setEditingEmployee}
-            setShowAddCommType={setShowAddCommType}
-            setViewingSale={setViewingSale}
-            setVoidingSale={setVoidingSale}
-            setVoidReason={setVoidReason}
-            setViewingShift={setViewingShift}
-            setShiftNotesDraft={setShiftNotesDraft}
-            setViewingAuditItem={setViewingAuditItem}
-            setConfirmAction={setConfirmAction}
-            activeBusinessDate={activeBusinessDate}
-            shiftStatus={shiftStatus}
-            openSod={openSod}
-            openEod={openEod}
-            onApplyDateRange={handleApplyDateRange}
-            data={data}
-            fin={fin}
-            filteredSales={filteredSales}
-            filteredProducts={filteredProducts}
-            filteredExpenses={filteredExpenses}
-            filteredSalaries={filteredSalaries}
-            filteredCommissions={filteredCommissions}
-            filteredLdCommissions={filteredLdCommissions}
-            filteredEmployees={filteredEmployees}
-            filteredShifts={filteredShifts}
-            filteredAudit={filteredAudit}
-            jumpToReport={jumpToReport}
-            loadAll={loadAll}
-            toast={ctrl.toast}
-          />
+          {visibility.sections?.reports !== false && (
+            <AdminReportsModule
+              reportSectionRef={reportSectionRef}
+              reportTab={reportTab}
+              setReportTab={setReportTab}
+              visibleTabs={visibility.tabs}
+              from={from}
+              to={to}
+              search={search}
+              setSearch={setSearch}
+              categoryFilter={categoryFilter}
+              setCategoryFilter={setCategoryFilter}
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              staffFilter={staffFilter}
+              setStaffFilter={setStaffFilter}
+              allProductCategories={allProductCategories}
+              allStaffNames={allStaffNames}
+              commissionTypes={commissionTypes}
+              employeesList={employeesList}
+              selectedIds={selectedIds}
+              setSelectedIds={setSelectedIds}
+              handleBulkDelete={handleBulkDelete}
+              setEditingProduct={setEditingProduct}
+              setRestockModal={setRestockModal}
+              setEditingExpense={setEditingExpense}
+              setEditingSalary={setEditingSalary}
+              setEditingCommission={setEditingCommission}
+              setEditingLdCommission={setEditingLdCommission}
+              setEditingEmployee={setEditingEmployee}
+              setShowAddCommType={setShowAddCommType}
+              setViewingSale={setViewingSale}
+              setVoidingSale={setVoidingSale}
+              setVoidReason={setVoidReason}
+              setViewingShift={setViewingShift}
+              setShiftNotesDraft={setShiftNotesDraft}
+              setViewingAuditItem={setViewingAuditItem}
+              setConfirmAction={setConfirmAction}
+              activeBusinessDate={activeBusinessDate}
+              shiftStatus={shiftStatus}
+              openSod={openSod}
+              openEod={openEod}
+              onApplyDateRange={handleApplyDateRange}
+              data={data}
+              fin={fin}
+              filteredSales={filteredSales}
+              filteredProducts={filteredProducts}
+              filteredExpenses={filteredExpenses}
+              filteredSalaries={filteredSalaries}
+              filteredCommissions={filteredCommissions}
+              filteredLdCommissions={filteredLdCommissions}
+              filteredEmployees={filteredEmployees}
+              filteredShifts={filteredShifts}
+              filteredAudit={filteredAudit}
+              jumpToReport={jumpToReport}
+              loadAll={loadAll}
+              toast={ctrl.toast}
+            />
+          )}
         </>
       )}
 
@@ -551,6 +642,162 @@ export function AdminDashboard(props = {}) {
         confirmAction={confirmAction}
         setConfirmAction={setConfirmAction}
       />
+
+      {/* 5. View Customization Modal */}
+      {showCustomizeModal && (
+        <Modal
+          title="Customize Admin Dashboard & Reports"
+          onClose={() => setShowCustomizeModal(false)}
+        >
+          <div style={{ maxHeight: "70vh", overflowY: "auto", paddingRight: 6 }}>
+            <p className="muted" style={{ fontSize: 13, marginBottom: 18 }}>
+              Configure which sections, executive KPI tiles, and report tabs are displayed on this dashboard. Preferences are saved automatically on this device.
+            </p>
+
+            {/* A. High-level Dashboard Sections */}
+            <div style={{ marginBottom: 20 }}>
+              <h4 style={{ margin: "0 0 10px 0", fontSize: 14, color: "var(--accent)" }}>
+                Main Dashboard Sections
+              </h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {[
+                  { key: "kpi_grid", label: "Executive KPI Cards" },
+                  { key: "alerts_activity", label: "Shift Alerts & Activity" },
+                  { key: "charts", label: "Analytics & Financial Charts" },
+                  { key: "reports", label: "Store Reports & CRUD Module" },
+                ].map((sec) => (
+                  <label
+                    key={sec.key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 12px",
+                      background: "var(--card-bg, rgba(255,255,255,0.03))",
+                      border: "1px solid var(--border)",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 13,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visibility.sections[sec.key] !== false}
+                      onChange={() => toggleVisibility("sections", sec.key)}
+                    />
+                    <span>{sec.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* B. Executive KPI Tiles */}
+            <div style={{ marginBottom: 20 }}>
+              <h4 style={{ margin: "0 0 10px 0", fontSize: 14, color: "var(--accent)" }}>
+                Executive KPI Tiles
+              </h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {[
+                  { key: "tile_sales", label: "Total Net Sales" },
+                  { key: "tile_gross", label: "Gross Profit (P&L)" },
+                  { key: "tile_expenses", label: "Overheads & Payroll" },
+                  { key: "tile_net", label: "Net Store Profit" },
+                  { key: "tile_today", label: "Today's Shift Sales" },
+                  { key: "tile_mtd", label: "Month to Date (MTD)" },
+                  { key: "tile_stock", label: "Stock Alerts" },
+                  { key: "tile_voided", label: "Voided Orders" },
+                ].map((tile) => (
+                  <label
+                    key={tile.key}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 12px",
+                      background: "var(--card-bg, rgba(255,255,255,0.03))",
+                      border: "1px solid var(--border)",
+                      borderRadius: 6,
+                      cursor: "pointer",
+                      fontSize: 13,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={visibility.tiles[tile.key] !== false}
+                      onChange={() => toggleVisibility("tiles", tile.key)}
+                    />
+                    <span>{tile.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* C. Report & Management Tabs */}
+            <div style={{ marginBottom: 20 }}>
+              <h4 style={{ margin: "0 0 10px 0", fontSize: 14, color: "var(--accent)" }}>
+                Store Reports & CRUD Tabs
+              </h4>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {REPORT_TABS.map((tab) => {
+                  const tabKey = `tab_${tab.id}`;
+                  const Icon = tab.icon;
+                  return (
+                    <label
+                      key={tab.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "8px 12px",
+                        background: "var(--card-bg, rgba(255,255,255,0.03))",
+                        border: "1px solid var(--border)",
+                        borderRadius: 6,
+                        cursor: "pointer",
+                        fontSize: 13,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visibility.tabs[tabKey] !== false}
+                        onChange={() => toggleVisibility("tabs", tabKey)}
+                      />
+                      {Icon && <Icon size={14} style={{ opacity: 0.7 }} />}
+                      <span>{tab.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 18,
+              borderTop: "1px solid var(--border)",
+              paddingTop: 12,
+            }}
+          >
+            <button
+              type="button"
+              className="btn ghost sm"
+              onClick={resetVisibility}
+              title="Reset all tiles and reports to visible"
+            >
+              Reset to Defaults
+            </button>
+            <button
+              type="button"
+              className="btn primary sm"
+              onClick={() => setShowCustomizeModal(false)}
+            >
+              Done
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

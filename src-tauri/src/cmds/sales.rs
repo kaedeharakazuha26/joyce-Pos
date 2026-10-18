@@ -102,7 +102,9 @@ pub fn list_sales(db: State<Db>, from: String, to: String, status: String) -> R<
     let mut list = rows(
         &c,
         r#"
-        SELECT * FROM sales
+        SELECT *,
+               COALESCE((SELECT business_date FROM shifts WHERE id=sales.shift_id), date(created_at)) AS business_date
+        FROM sales
         WHERE COALESCE((SELECT business_date FROM shifts WHERE id=sales.shift_id), date(created_at)) BETWEEN ?1 AND ?2
           AND (?3='' OR status=?3)
         ORDER BY id DESC LIMIT 1000

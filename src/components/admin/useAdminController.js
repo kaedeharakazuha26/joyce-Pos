@@ -141,21 +141,21 @@ export function useAdminController({
 
         const normExpenses = (expensesData || []).map((ex) => ({
           ...ex,
-          incurred_on: ex.date || ex.incurred_on || ymd(),
+          incurred_on: ex.business_date || ex.date || ex.incurred_on || ymd(),
         }));
 
         const normSalaries = (salariesData || []).map((sal) => ({
           ...sal,
           staff_name: sal.employee || sal.staff_name || "Staff",
           role: sal.period || sal.role || "Regular Period",
-          paid_on: sal.date || sal.paid_on || ymd(),
+          paid_on: sal.business_date || sal.date || sal.paid_on || ymd(),
         }));
 
         const normCommissions = (commissionsData || []).map((c) => ({
           ...c,
           staff_name: c.employee_name || c.staff_name || "Staff",
           commission_type: c.type || c.commission_type || "Sales",
-          earned_on: c.date || c.earned_on || ymd(),
+          earned_on: c.business_date || c.date || c.earned_on || ymd(),
           sales_ref: c.sales_ref || "",
           rate_pct: Number(c.rate_pct || 0),
           note: c.note || "",
@@ -174,7 +174,7 @@ export function useAdminController({
             total: amt,
             amount: amt,
             note: ld.note || "",
-            earned_on: ld.date || ld.earned_on || ymd(),
+            earned_on: ld.business_date || ld.date || ld.earned_on || ymd(),
           };
         });
 
@@ -206,29 +206,38 @@ export function useAdminController({
         });
 
         const normDaily = (rawDash?.daily || []).map((d) => {
-          const salesVal = Number(d.sales ?? d.total ?? 0);
+          const salesVal = Number(d.sales ?? d.total ?? d.revenue ?? 0);
           const cogsVal = Number(d.cogs || 0);
           const gpVal = Number(d.gross_profit ?? salesVal - cogsVal);
           const expVal = Number(d.expenses || 0);
           const salVal = Number(d.salaries || 0);
           const comVal = Number(d.commissions || 0);
           const ldVal = Number(d.ld_commissions || 0);
+          const overheadsVal = expVal + salVal + comVal + ldVal;
           const netVal = Number(
-            d.net_after_cogs ?? d.net ?? gpVal - expVal - salVal - comVal - ldVal
+            d.net_after_cogs ?? d.net ?? d.net_profit ?? gpVal - overheadsVal
           );
+          const dayStr = d.day || d.date || "";
+          const orderCount = Number(d.orders ?? d.count ?? 0);
           return {
             ...d,
-            date: d.day || d.date,
+            day: dayStr,
+            date: dayStr,
+            orders: orderCount,
+            count: orderCount,
             total: salesVal,
             sales: salesVal,
+            revenue: salesVal,
             cogs: cogsVal,
             gross_profit: gpVal,
             expenses: expVal,
             salaries: salVal,
             commissions: comVal,
             ld_commissions: ldVal,
+            overheads: overheadsVal,
+            total_overheads: overheadsVal,
             net: netVal,
-            count: Number(d.count || 0),
+            net_profit: netVal,
           };
         });
 
