@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState, Fragment } from "react";
 import {
   Award,
   TrendingUp,
@@ -1041,7 +1041,7 @@ export default function Dashboard() {
                   const isLow = stock > 0 && stock <= lowStock;
 
                   return (
-                    <React.Fragment key={item.id}>
+                    <Fragment key={item.id}>
                       <tr className="row-hover">
                         <td>
                           <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -1165,7 +1165,7 @@ export default function Dashboard() {
                           </td>
                         </tr>
                       )}
-                    </React.Fragment>
+                    </Fragment>
                   );
                 })}
               </tbody>

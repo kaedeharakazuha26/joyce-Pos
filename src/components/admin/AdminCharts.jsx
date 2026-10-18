@@ -565,35 +565,35 @@ export function AdminChartsSection({
 
     const rawEmps = (data.employee_performance && data.employee_performance.length > 0)
       ? data.employee_performance.map((e) => {
-          const sal = showSalary ? Number(e.salary_total || 0) : 0;
-          const com = showCommission ? Number(e.commission_total || 0) : 0;
-          const ld = showLdCommission ? Number(e.ld_total || 0) : 0;
-          return {
-            type: "employee",
-            name: e.staff_name,
-            salary: sal,
-            commission: com,
-            ld_commission: ld,
-            ld_drinks: showLdCommission ? Number(e.ld_drinks || 0) : 0,
-            total: sal + com + ld,
-            color: "#a855f7",
-          };
-        })
+        const sal = showSalary ? Number(e.salary_total || 0) : 0;
+        const com = showCommission ? Number(e.commission_total || 0) : 0;
+        const ld = showLdCommission ? Number(e.ld_total || 0) : 0;
+        return {
+          type: "employee",
+          name: e.staff_name,
+          salary: sal,
+          commission: com,
+          ld_commission: ld,
+          ld_drinks: showLdCommission ? Number(e.ld_drinks || 0) : 0,
+          total: sal + com + ld,
+          color: "#a855f7",
+        };
+      })
       : (data.top_employees || []).map((e) => {
-          const sal = showSalary ? Number(e.salary || 0) : 0;
-          const com = showCommission ? Number(e.commission || 0) : 0;
-          const ld = showLdCommission ? Number(e.ld_commission || 0) : 0;
-          return {
-            type: "employee",
-            name: e.employee_name,
-            salary: sal,
-            commission: com,
-            ld_commission: ld,
-            ld_drinks: 0,
-            total: sal + com + ld,
-            color: "#a855f7",
-          };
-        });
+        const sal = showSalary ? Number(e.salary || 0) : 0;
+        const com = showCommission ? Number(e.commission || 0) : 0;
+        const ld = showLdCommission ? Number(e.ld_commission || 0) : 0;
+        return {
+          type: "employee",
+          name: e.employee_name,
+          salary: sal,
+          commission: com,
+          ld_commission: ld,
+          ld_drinks: 0,
+          total: sal + com + ld,
+          color: "#a855f7",
+        };
+      });
 
     const sorted = [...rawEmps];
     if (employeeReportView === "salary") {
@@ -748,8 +748,8 @@ export function AdminChartsSection({
               doughnutMode === "category"
                 ? "Gross Sales"
                 : doughnutMode === "expense"
-                ? "Expenses"
-                : "Total Costs"
+                  ? "Expenses"
+                  : "Total Costs"
             }
             selectedKey={categoryFilter !== "all" ? categoryFilter : null}
             onSelectItem={(item) => {
@@ -821,7 +821,7 @@ export function AdminChartsSection({
           <div className="chart-card-head">
             <div>
               <h3>
-                <Award size={18} color="#ffb020" /> Highest Income per Employee
+                <Award size={18} color="#ffb020" /> Highest Income per Employee and Top Products
               </h3>
               <p className="muted">
                 {employeeReportView === "products"
