@@ -697,7 +697,173 @@ pub fn save_ld_commission(db: State<Db>, commission: Value) -> R<()> {
     let c = db.0.lock().map_err(e)?;
     let (date, eid, name, _, amt) = comm_args(&c, &commission, false)?;
     let shift_id = get_active_shift(&c).map(|(sid, _)| sid);
-             SELECT employee AS employee_name, amount, 'salary' AS src FROM salaries WHERE date BETWEEN ?1 AND ?2
+    let qty = commission.get("quantity").and_then(|x| x.as_i64()).unwrap_or(1).max(1);
+    let actor = text(&commission, "actor");
+    let role = text(&commission, "actor_role");
+    match commission.get("id").and_then(|x| x.as_i64()) {
+        Some(id) => {
+            let prev = rows(&c, "SELECT * FROM ld_commissions WHERE id=?", &[&id]).ok().and_then(|mut r| r.pop()).unwrap_or(json!(null));
+            c.execute(
+                "UPDATE ld_commissions SET date=?,employee_id=?,employee_name=?,quantity=?,amount=? WHERE id=?",
+                params![date, eid, name, qty, amt, id],
+            ).map_err(e)?;
+            log_audit(
+                &c,
+                &actor,
+                &role,
+                "UPDATE",
+                "ld_commission",
+                &id.to_string(),
+                &format!("Updated LD commission #{} for '{}' (Qty: {}, ₱{:.2})", id, name, qty, amt),
+                json!({ "before": prev, "after": { "id": id, "date": date, "employee_id": eid, "employee_name": name, "quantity": qty, "amount": amt } }),
+            );
+        }
+        None => {
+            c.execute(
+                "INSERT INTO ld_commissions(date,employee_id,employee_name,quantity,amount,shift_id) VALUES(?,?,?,?,?,?)",
+                params![date, eid, name, qty, amt, shift_id],
+            ).map_err(e)?;
+            let id = c.last_insert_rowid();
+            log_audit(
+                &c,
+                &actor,
+                &role,
+                "CREATE",
+                "ld_commission",
+                &id.to_string(),
+                &format!("Recorded LD commission for '{}' (Qty: {}, ₱{:.2})", name, qty, amt),
+                json!({ "id": id, "date": date, "employee_id": eid, "employee_name": name, "quantity": qty, "amount": amt }),
+            );
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_ld_commission(db: State<Db>, id: i64) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    let prev = rows(&c, "SELECT * FROM ld_commissions WHERE id=?", &[&id]).ok().and_then(|mut r| r.pop()).unwrap_or(json!({"id": id}));
+    let emp = prev.get("employee_name").and_then(|x| x.as_str()).unwrap_or("Employee");
+    let amt = prev.get("amount").and_then(|x| x.as_f64()).unwrap_or(0.0);
+    c.execute("DELETE FROM ld_commissions WHERE id=?", [id]).map_err(e)?;
+    log_audit(
+        &c,
+        "Administrator",
+        "admin",
+        "DELETE",
+        "ld_commission",
+        &id.to_string(),
+        &format!("Deleted LD commission #{} for '{}' (₱{:.2})", id, emp, amt),
+        json!({ "deleted": prev }),
+    );
+    Ok(())
+}
+
+// ───────────────────────── Employees ─────────────────────────
+
+#[tauri::command]
+pub fn list_employees(db: State<Db>) -> R<Vec<Value>> {
+    let c = db.0.lock().map_err(e)?;
+    rows(&c, "SELECT * FROM employees WHERE active=1 ORDER BY name COLLATE NOCASE", &[])
+}
+
+#[tauri::command]
+pub fn save_employee(db: State<Db>, employee: Value) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    let name = text(&employee, "name");
+    if name.is_empty() {
+        return Err("Employee name is required".into());
+    }
+    let (pos, com, ld, sal) = (text(&employee, "position"), num(&employee, "commission"), num(&employee, "ld_commission"), num(&employee, "salary"));
+    let actor = text(&employee, "actor");
+    let role = text(&employee, "actor_role");
+    match employee.get("id").and_then(|x| x.as_i64()) {
+        Some(id) => {
+            let prev = rows(&c, "SELECT * FROM employees WHERE id=?", &[&id]).ok().and_then(|mut r| r.pop()).unwrap_or(json!(null));
+            c.execute(
+                "UPDATE employees SET name=?,position=?,commission=?,ld_commission=?,salary=? WHERE id=?",
+                params![name, pos, com, ld, sal, id],
+            ).map_err(e)?;
+            log_audit(
+                &c,
+                &actor,
+                &role,
+                "UPDATE",
+                "employee",
+                &id.to_string(),
+                &format!("Updated employee '{}' ({})", name, if pos.is_empty() { "Staff" } else { &pos }),
+                json!({ "before": prev, "after": { "id": id, "name": name, "position": pos, "commission": com, "ld_commission": ld, "salary": sal } }),
+            );
+        }
+        None => {
+            c.execute(
+                "INSERT INTO employees(name,position,commission,ld_commission,salary,created_at) VALUES(?,?,?,?,?,?)",
+                params![name, pos, com, ld, sal, now()],
+            ).map_err(e)?;
+            let id = c.last_insert_rowid();
+            log_audit(
+                &c,
+                &actor,
+                &role,
+                "CREATE",
+                "employee",
+                &id.to_string(),
+                &format!("Added employee '{}' ({})", name, if pos.is_empty() { "Staff" } else { &pos }),
+                json!({ "id": id, "name": name, "position": pos, "commission": com, "ld_commission": ld, "salary": sal }),
+            );
+        }
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_employee(db: State<Db>, id: i64) -> R<()> {
+    let c = db.0.lock().map_err(e)?;
+    let prev = rows(&c, "SELECT * FROM employees WHERE id=?", &[&id]).ok().and_then(|mut r| r.pop()).unwrap_or(json!({"id": id}));
+    let ename = prev.get("name").and_then(|x| x.as_str()).unwrap_or("Employee");
+    c.execute("UPDATE employees SET active=0 WHERE id=?", [id]).map_err(e)?;
+    log_audit(
+        &c,
+        "Administrator",
+        "admin",
+        "ARCHIVE",
+        "employee",
+        &id.to_string(),
+        &format!("Archived employee '{}' (historical payroll records preserved)", ename),
+        json!({ "archived": prev }),
+    );
+    Ok(())
+}
+
+// ───────────────────────── Dashboard ─────────────────────────
+
+#[tauri::command]
+pub fn dashboard(db: State<Db>, from: String, to: String) -> R<Value> {
+    let c = db.0.lock().map_err(e)?;
+    let p: &[&dyn ToSql] = &[&from, &to];
+    let range = "status='completed' AND date(created_at) BETWEEN ?1 AND ?2";
+    let revenue = scalar(&c, &format!("SELECT COALESCE(SUM(total),0) FROM sales WHERE {range}"), p);
+    let count = scalar(&c, &format!("SELECT COUNT(*) FROM sales WHERE {range}"), p);
+    let cogs = scalar(&c, &format!("SELECT COALESCE(SUM(cost_total),0) FROM sale_items WHERE sale_id IN (SELECT id FROM sales WHERE {range})"), p);
+    let voided = scalar(&c, "SELECT COALESCE(SUM(total),0) FROM voided_sales WHERE date(voided_at) BETWEEN ?1 AND ?2", p);
+    let voided_n = scalar(&c, "SELECT COUNT(*) FROM voided_sales WHERE date(voided_at) BETWEEN ?1 AND ?2", p);
+    let expenses = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM expenses WHERE date BETWEEN ?1 AND ?2", p);
+    let salaries = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM salaries WHERE date BETWEEN ?1 AND ?2", p);
+    let commissions = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM commissions WHERE date BETWEEN ?1 AND ?2", p);
+    let ld_commissions = scalar(&c, "SELECT COALESCE(SUM(amount),0) FROM ld_commissions WHERE date BETWEEN ?1 AND ?2", p);
+    let gross = revenue - cogs;
+    let net = gross - expenses - salaries - commissions - ld_commissions;
+
+    let top_employees = rows(
+        &c,
+        r#"
+        SELECT employee_name,
+               ROUND(SUM(amount), 2) AS total,
+               ROUND(SUM(CASE WHEN src='salary' THEN amount ELSE 0 END), 2) AS salary,
+               ROUND(SUM(CASE WHEN src='commission' THEN amount ELSE 0 END), 2) AS commission,
+               ROUND(SUM(CASE WHEN src='ld' THEN amount ELSE 0 END), 2) AS ld_commission
+        FROM (
+            SELECT employee AS employee_name, amount, 'salary' AS src FROM salaries WHERE date BETWEEN ?1 AND ?2
             UNION ALL
             SELECT employee_name, amount, 'commission' AS src FROM commissions WHERE date BETWEEN ?1 AND ?2
             UNION ALL
