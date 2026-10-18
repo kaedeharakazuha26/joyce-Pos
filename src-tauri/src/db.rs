@@ -223,7 +223,8 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             items_json TEXT NOT NULL,
             sold_at TEXT NOT NULL,
             voided_at TEXT NOT NULL,
-            voided_by TEXT NOT NULL DEFAULT ''
+            voided_by TEXT NOT NULL DEFAULT '',
+            shift_id INTEGER DEFAULT NULL
         );
 
         CREATE TABLE IF NOT EXISTS restocks(
@@ -233,7 +234,8 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
             qty INTEGER NOT NULL,
             unit_cost REAL NOT NULL DEFAULT 0,
             note TEXT NOT NULL DEFAULT '',
-            created_at TEXT NOT NULL
+            created_at TEXT NOT NULL,
+            shift_id INTEGER DEFAULT NULL
         );
 
         CREATE TABLE IF NOT EXISTS expenses(
@@ -360,6 +362,8 @@ pub fn init(conn: &Connection) -> rusqlite::Result<()> {
     let _ = conn.execute("ALTER TABLE salaries ADD COLUMN shift_id INTEGER DEFAULT NULL", []);
     let _ = conn.execute("ALTER TABLE commissions ADD COLUMN shift_id INTEGER DEFAULT NULL", []);
     let _ = conn.execute("ALTER TABLE ld_commissions ADD COLUMN shift_id INTEGER DEFAULT NULL", []);
+    let _ = conn.execute("ALTER TABLE voided_sales ADD COLUMN shift_id INTEGER DEFAULT NULL", []);
+    let _ = conn.execute("ALTER TABLE restocks ADD COLUMN shift_id INTEGER DEFAULT NULL", []);
 
     Ok(())
 }

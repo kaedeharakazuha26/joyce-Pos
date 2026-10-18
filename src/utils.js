@@ -11,26 +11,40 @@ export const pesoShort = (n) => {
 };
 
 const pad = (n) => String(n).padStart(2, "0");
-export const ymd = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
-export const daysAgo = (n) => {
-  const d = new Date();
+export const toDate = (ref) => {
+  if (!ref) return new Date();
+  if (ref instanceof Date) return new Date(ref.getTime());
+  if (typeof ref === "string" && /^\d{4}-\d{2}-\d{2}$/.test(ref)) {
+    return new Date(`${ref}T12:00:00`);
+  }
+  return new Date(ref);
+};
+
+export const ymd = (d = new Date()) => {
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  const dt = toDate(d);
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+};
+
+export const daysAgo = (n, ref) => {
+  const d = toDate(ref);
   d.setDate(d.getDate() - n);
   return ymd(d);
 };
 
-export const yesterday = () => daysAgo(1);
+export const yesterday = (ref) => daysAgo(1, ref);
 
-export const weekStart = () => {
-  const d = new Date();
+export const weekStart = (ref) => {
+  const d = toDate(ref);
   const day = d.getDay(); // 0=Sun..6=Sat
   const diff = day === 0 ? 6 : day - 1; // Monday start
   d.setDate(d.getDate() - diff);
   return ymd(d);
 };
 
-export const lastWeekRange = () => {
-  const d = new Date();
+export const lastWeekRange = (ref) => {
+  const d = toDate(ref);
   const day = d.getDay();
   const diff = day === 0 ? 6 : day - 1;
   const end = new Date(d.getFullYear(), d.getMonth(), d.getDate() - diff - 1);
@@ -38,26 +52,26 @@ export const lastWeekRange = () => {
   return [ymd(start), ymd(end)];
 };
 
-export const monthStart = () => {
-  const d = new Date();
+export const monthStart = (ref) => {
+  const d = toDate(ref);
   return ymd(new Date(d.getFullYear(), d.getMonth(), 1));
 };
 
-export const lastMonthRange = () => {
-  const d = new Date();
+export const lastMonthRange = (ref) => {
+  const d = toDate(ref);
   const start = new Date(d.getFullYear(), d.getMonth() - 1, 1);
   const end = new Date(d.getFullYear(), d.getMonth(), 0);
   return [ymd(start), ymd(end)];
 };
 
-export const quarterStart = () => {
-  const d = new Date();
+export const quarterStart = (ref) => {
+  const d = toDate(ref);
   const qMonth = Math.floor(d.getMonth() / 3) * 3;
   return ymd(new Date(d.getFullYear(), qMonth, 1));
 };
 
-export const yearStart = () => {
-  const d = new Date();
+export const yearStart = (ref) => {
+  const d = toDate(ref);
   return ymd(new Date(d.getFullYear(), 0, 1));
 };
 
@@ -83,13 +97,13 @@ export const pctChange = (current, previous) => {
 
 export const DATE_PRESETS = [
   { id: "today", label: "Today", range: (bizDate) => [bizDate || ymd(), bizDate || ymd()] },
-  { id: "yesterday", label: "Yesterday", range: () => [yesterday(), yesterday()] },
-  { id: "this_week", label: "This Week", range: () => [weekStart(), ymd()] },
-  { id: "last_week", label: "Last Week", range: () => lastWeekRange() },
-  { id: "this_month", label: "This Month", range: () => [monthStart(), ymd()] },
-  { id: "last_month", label: "Last Month", range: () => lastMonthRange() },
-  { id: "this_quarter", label: "This Quarter", range: () => [quarterStart(), ymd()] },
-  { id: "this_year", label: "This Year", range: () => [yearStart(), ymd()] },
+  { id: "yesterday", label: "Yesterday", range: (bizDate) => [yesterday(bizDate), yesterday(bizDate)] },
+  { id: "this_week", label: "This Week", range: (bizDate) => [weekStart(bizDate), bizDate || ymd()] },
+  { id: "last_week", label: "Last Week", range: (bizDate) => lastWeekRange(bizDate) },
+  { id: "this_month", label: "This Month", range: (bizDate) => [monthStart(bizDate), bizDate || ymd()] },
+  { id: "last_month", label: "Last Month", range: (bizDate) => lastMonthRange(bizDate) },
+  { id: "this_quarter", label: "This Quarter", range: (bizDate) => [quarterStart(bizDate), bizDate || ymd()] },
+  { id: "this_year", label: "This Year", range: (bizDate) => [yearStart(bizDate), bizDate || ymd()] },
 ];
 
 export const downloadBlob = (filename, content, mime = "text/csv;charset=utf-8") => {

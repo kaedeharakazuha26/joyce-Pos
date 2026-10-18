@@ -40,11 +40,21 @@ export function useAdminController({
   const [preset, setPreset] = useState("this_month");
   const [from, setFrom] = useState(() => {
     const p = DATE_PRESETS.find((d) => d.id === "this_month");
-    return p ? p.range()[0] : daysAgo(29);
+    return p ? p.range(activeBusinessDate)[0] : daysAgo(29, activeBusinessDate);
   });
-  const [to, setTo] = useState(() => ymd());
+  const [to, setTo] = useState(() => activeBusinessDate || ymd());
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
+
+  // If active business shift date updates, re-anchor draft & filters if on today or default
+  useEffect(() => {
+    if (activeBusinessDate && to !== activeBusinessDate && preset === "today") {
+      setFrom(activeBusinessDate);
+      setTo(activeBusinessDate);
+      setDraftFrom(activeBusinessDate);
+      setDraftTo(activeBusinessDate);
+    }
+  }, [activeBusinessDate, preset, to]);
 
   // 2. Core Data State
   const [loading, setLoading] = useState(true);
@@ -468,7 +478,7 @@ export function useAdminController({
 
   const handleResetAllFilters = () => {
     const def = DATE_PRESETS.find((d) => d.id === "this_month");
-    const [f, t] = def ? def.range() : [daysAgo(29), ymd()];
+    const [f, t] = def ? def.range(activeBusinessDate) : [daysAgo(29, activeBusinessDate), activeBusinessDate || ymd()];
     setPreset("this_month");
     setDraftFrom(f);
     setDraftTo(t);

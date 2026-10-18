@@ -31,7 +31,7 @@ import { AdminCrudModals } from "../components/admin/AdminModals";
 
 /**
  * Modern Executive Admin Dashboard, Reporting, Analytics & Full CRUD System
- * Designed to be beginner/student-friendly with step-by-step visual formulas
+ * Designed to be beginner/user-friendly with step-by-step visual formulas
  * and Safe End-of-Day (EOD) Google Drive Backup protection.
  */
 export function AdminDashboard(props = {}) {
@@ -50,7 +50,7 @@ export function AdminDashboard(props = {}) {
   const onClearExternalCommand =
     props.onClearExternalCommand || ctx.clearAdminReportIntent;
 
-  const [showStudentGuide, setShowStudentGuide] = useState(false);
+  const [showtGuide, setShowGuide] = useState(false);
 
   const ctrl = useAdminController({
     toast,
@@ -198,8 +198,9 @@ export function AdminDashboard(props = {}) {
                 type="button"
                 className={`preset-pill ${preset === p.id ? "active" : ""}`}
                 onClick={() => handleSelectPreset(p.id)}
+                title={p.id === "today" && activeBusinessDate ? `Shift Date: ${activeBusinessDate}` : p.label}
               >
-                {p.label}
+                {p.id === "today" ? (activeBusinessDate ? "Today (Shift)" : "Today") : p.label}
               </button>
             ))}
           </div>
@@ -267,6 +268,23 @@ export function AdminDashboard(props = {}) {
               </div>
             )}
 
+            {/* Overnight Shift Midnight-Persistence Badge */}
+            {shiftStatus?.is_open && (openShiftObj?.business_date || activeBusinessDate) && (openShiftObj?.business_date || activeBusinessDate) !== ymd() && (
+              <div
+                className="shift-indicator"
+                style={{
+                  background: "linear-gradient(90deg, rgba(124, 92, 255, 0.2), rgba(77, 166, 255, 0.2))",
+                  border: "1px solid rgba(124, 92, 255, 0.5)",
+                  color: "#d0d4ff",
+                }}
+              >
+                <span>🌙</span>
+                <span>
+                  <b>Overnight Active:</b> Midnight passed; all transactions remain on Business Date <b>{openShiftObj?.business_date || activeBusinessDate}</b> until EOD close.
+                </span>
+              </div>
+            )}
+
             {/* Safe Google Drive EOD Snapshot Quick Button */}
             <button
               type="button"
@@ -283,21 +301,13 @@ export function AdminDashboard(props = {}) {
               {syncingGdrive
                 ? "Backing up…"
                 : branchInfo?.storage_dir
-                ? "☁️ Save EOD Backup Now"
-                : "📁 Save EOD Backup Now"}
+                  ? "☁️ Save EOD Backup Now"
+                  : "📁 Save EOD Backup Now"}
             </button>
           </div>
 
           <div className="admin-export-actions">
-            <button
-              type="button"
-              className="btn ghost sm"
-              onClick={() => setShowStudentGuide((v) => !v)}
-              title="Open Student-Friendly Guide to Dashboard & Google Drive Backups"
-            >
-              <BookOpen size={14} color="var(--info)" />
-              {showStudentGuide ? "Hide Guide" : "Student Guide"}
-            </button>
+
             <button
               type="button"
               className="btn ghost sm"
@@ -368,119 +378,7 @@ export function AdminDashboard(props = {}) {
         )}
       </section>
 
-      {/* 1B. Student-Friendly Simple Profit Formula Bar (Always visible so anyone understands the numbers!) */}
-      <section className="formula-guide-bar card no-print" aria-label="How Store Profit is Calculated">
-        <div className="formula-header-row">
-          <div className="formula-title">
-            <HelpCircle size={16} color="var(--accent)" />
-            <b>Simple Store Profit Formula ({from} to {to}):</b>
-            <span className="muted">Click any box below to inspect the exact records</span>
-          </div>
-          <div className="gdrive-status-pill">
-            <ShieldCheck size={14} color="var(--ok)" />
-            <span>
-              {branchInfo?.storage_dir
-                ? `☁️ Google Drive EOD Backup Active${branchInfo.last_backup_at ? ` (Last: ${branchInfo.last_backup_at.slice(0, 16)})` : ""}`
-                : "💻 Local Lock-Free DB Active (EOD Auto-Backup Enabled)"}
-            </span>
-          </div>
-        </div>
 
-        <div className="formula-steps-row">
-          <button
-            type="button"
-            className="formula-step-box tone-ok"
-            onClick={() => jumpToReport("sales", { status: "completed" })}
-          >
-            <span className="step-tag">STEP 1: MONEY IN</span>
-            <strong>{peso(grossSales)}</strong>
-            <small>Total Customer Sales</small>
-          </button>
-
-          <span className="formula-math-sign">−</span>
-
-          <button
-            type="button"
-            className="formula-step-box tone-info"
-            onClick={() => jumpToReport("products")}
-          >
-            <span className="step-tag">STEP 2: ITEM COST</span>
-            <strong>{peso(cogs)}</strong>
-            <small>Supplier Cost of Items Sold</small>
-          </button>
-
-          <span className="formula-math-sign">=</span>
-
-          <button
-            type="button"
-            className="formula-step-box tone-info"
-            onClick={() => jumpToReport("overview")}
-          >
-            <span className="step-tag">STEP 3: GROSS PROFIT</span>
-            <strong>{peso(grossProfit)}</strong>
-            <small>Profit from Items Sold</small>
-          </button>
-
-          <span className="formula-math-sign">−</span>
-
-          <button
-            type="button"
-            className="formula-step-box tone-warn"
-            onClick={() => jumpToReport("expenses")}
-          >
-            <span className="step-tag">STEP 4: BILLS & STAFF PAY</span>
-            <strong>{peso(totalOverheads)}</strong>
-            <small>Expenses + Salary + Comm + LD</small>
-          </button>
-
-          <span className="formula-math-sign">=</span>
-
-          <button
-            type="button"
-            className={`formula-step-box ${netProfit >= 0 ? "tone-ok" : "tone-bad"}`}
-            onClick={() => jumpToReport("overview")}
-          >
-            <span className="step-tag">STEP 5: TAKE-HOME PROFIT</span>
-            <strong style={{ color: netProfit >= 0 ? "var(--ok)" : "var(--bad)" }}>
-              {peso(netProfit)}
-            </strong>
-            <small>{netProfit >= 0 ? "Final Net Profit 🎉" : "Net Loss ⚠️"}</small>
-          </button>
-        </div>
-
-        {showStudentGuide && (
-          <div className="student-guide-drawer">
-            <div className="student-guide-col">
-              <h4>📊 1. How to Read This Dashboard (Like a Student)</h4>
-              <ul>
-                <li>
-                  <b>Total Sales (Money In):</b> All cash collected from completed customer receipts. (Voided/cancelled receipts are excluded so they don't fake your sales).
-                </li>
-                <li>
-                  <b>Item Cost (COGS — Cost of Goods Sold):</b> What you paid your supplier for the exact items sold. Example: If you buy a drink for ₱30 and sell it for ₱50, Sales = ₱50, COGS = ₱30, and Gross Profit = ₱20.
-                </li>
-                <li>
-                  <b>Bills & Staff Pay (Overheads):</b> Store expenses (electricity, ice, rent, supplies) + Staff Salaries + Regular Commissions + Ladies Drink (LD) Commissions.
-                </li>
-                <li>
-                  <b>Take-Home Net Profit:</b> What the store owner actually keeps after subtracting both Item Cost and all Bills/Staff Pay!
-                </li>
-              </ul>
-            </div>
-            <div className="student-guide-col">
-              <h4>☁️ 2. Why End-of-Day (EOD) Google Drive Backup Never Corrupts Your Database</h4>
-              <ul>
-                <li>
-                  <b>Why Real-Time Cloud Sync Is Risky for SQLite:</b> A live SQLite database uses 3 files at the same time (<code>.db</code>, <code>.db-wal</code>, <code>.db-shm</code>). If Google Drive syncs them mid-sale, it can lock the file (<i>"Database is locked"</i>) or upload mismatched files (corruption).
-                </li>
-                <li>
-                  <b>How JOYCE POS Protects You:</b> During store hours, your live database stays 100% on your fast local disk (zero cloud locking). When you click <b>End of Day (EOD)</b> (or <b>Save EOD Backup Now</b>), SQLite runs <code>VACUUM INTO</code> to write a clean, single-file snapshot into your Google Drive <code>EOD_Backups/</code> folder!
-                </li>
-              </ul>
-            </div>
-          </div>
-        )}
-      </section>
 
       {/* 2. Loading & Error States */}
       {loading && !data && (

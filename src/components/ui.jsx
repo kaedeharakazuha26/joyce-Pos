@@ -133,15 +133,16 @@ export function Field({ label, children, hint, error }) {
 }
 
 /** Date range picker with comprehensive business presets. */
-export function RangeBar({ from, to, setFrom, setTo, compact = false }) {
-  const todayStr = ymd();
-  const yestStr = yesterday();
-  const wkStart = weekStart();
-  const [lwFrom, lwTo] = lastWeekRange();
-  const mStart = monthStart();
-  const [lmFrom, lmTo] = lastMonthRange();
-  const qStart = quarterStart();
-  const yStart = yearStart();
+export function RangeBar({ from, to, setFrom, setTo, compact = false, businessDate }) {
+  const refDate = businessDate || ymd();
+  const todayStr = refDate;
+  const yestStr = yesterday(refDate);
+  const wkStart = weekStart(refDate);
+  const [lwFrom, lwTo] = lastWeekRange(refDate);
+  const mStart = monthStart(refDate);
+  const [lmFrom, lmTo] = lastMonthRange(refDate);
+  const qStart = quarterStart(refDate);
+  const yStart = yearStart(refDate);
 
   const preset = (a, b) => {
     setFrom(a);
@@ -151,7 +152,14 @@ export function RangeBar({ from, to, setFrom, setTo, compact = false }) {
 
   return (
     <div className="range">
-      <button type="button" className={"chip" + (isPreset(todayStr, todayStr) ? " active" : "")} onClick={() => preset(todayStr, todayStr)}>Today</button>
+      <button
+        type="button"
+        className={"chip" + (isPreset(todayStr, todayStr) ? " active" : "")}
+        onClick={() => preset(todayStr, todayStr)}
+        title={businessDate ? `Shift Business Date: ${businessDate}` : "Today"}
+      >
+        {businessDate ? "Today (Shift)" : "Today"}
+      </button>
       <button type="button" className={"chip" + (isPreset(yestStr, yestStr) ? " active" : "")} onClick={() => preset(yestStr, yestStr)}>Yesterday</button>
       <button type="button" className={"chip" + (isPreset(wkStart, todayStr) ? " active" : "")} onClick={() => preset(wkStart, todayStr)}>This Week</button>
       {!compact && (

@@ -39,13 +39,20 @@ const Stat = ({ label, value, sub, color, icon: Icon }) => (
 );
 
 export default function Dashboard() {
-  const { settings, branchInfo } = useSettings();
-  const [from, setFrom] = useState(daysAgo(6));
-  const [to, setTo] = useState(ymd());
+  const { settings, branchInfo, activeBusinessDate, shiftStatus } = useSettings();
+  const [from, setFrom] = useState(() => daysAgo(6, activeBusinessDate));
+  const [to, setTo] = useState(() => activeBusinessDate || ymd());
   const [d, setD] = useState(null);
   const [trendView, setTrendView] = useState("chart"); // "chart" | "table"
   const [showPdfModal, setShowPdfModal] = useState(false);
   const toast = useToast();
+
+  useEffect(() => {
+    if (activeBusinessDate && to !== activeBusinessDate && to === ymd()) {
+      setTo(activeBusinessDate);
+      setFrom(daysAgo(6, activeBusinessDate));
+    }
+  }, [activeBusinessDate]);
 
   const load = useCallback(() => {
     api.dashboard(from, to)
@@ -104,8 +111,34 @@ export default function Dashboard() {
   return (
     <>
       <PageHeader title="Dashboard" subtitle="Sales, payroll & performance reporting">
-        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} />
+        <RangeBar from={from} to={to} setFrom={setFrom} setTo={setTo} businessDate={activeBusinessDate} />
       </PageHeader>
+
+      {/* Overnight Shift Midnight-Persistence Alert Banner */}
+      {shiftStatus?.is_open && activeBusinessDate && activeBusinessDate !== ymd() && (
+        <div
+          style={{
+            background: "linear-gradient(90deg, rgba(124, 92, 255, 0.15), rgba(77, 166, 255, 0.15))",
+            border: "1px solid rgba(124, 92, 255, 0.4)",
+            borderRadius: "10px",
+            padding: "10px 16px",
+            marginBottom: "16px",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            fontSize: "0.9rem",
+            color: "#d0d4ff",
+          }}
+        >
+          <span style={{ fontSize: "1.3rem" }}>🌙</span>
+          <div>
+            <b>Overnight Shift Active (Midnight Persisted):</b>
+            <div style={{ fontSize: "0.82rem", color: "rgba(208, 212, 255, 0.8)" }}>
+              All sales, revenue, expenses, and transactions remain attributed to Business Shift Date <b>{activeBusinessDate}</b> (even past midnight) until official End of Day close.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick summary status chips */}
       <div className="dash-chips">
