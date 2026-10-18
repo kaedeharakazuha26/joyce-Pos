@@ -66,9 +66,9 @@
     "semantic_hash": ""
   },
   "src/App.jsx": {
-    "mtime": 1792272243.3492563,
-    "seen": 1792272737.9652307,
-    "ast_hash": "48972857b2ed5fffae0125763bfdbee8",
+    "mtime": 1792330210.7654178,
+    "seen": 1792335429.8563955,
+    "ast_hash": "466ce138b27379d05ceb6040bbbaefbd",
     "semantic_hash": ""
   },
   "src/api.js": {
@@ -90,15 +90,15 @@
     "semantic_hash": ""
   },
   "src/pages/Dashboard.jsx": {
-    "mtime": 1792321457.8162625,
-    "seen": 1792322722.1989353,
-    "ast_hash": "41263fca7843a5d2dbc74a922a37d405",
+    "mtime": 1792335203.1300309,
+    "seen": 1792335429.856427,
+    "ast_hash": "9cafa0cf028960d36e3151606ed07a81",
     "semantic_hash": ""
   },
   "src/pages/Expenses.jsx": {
-    "mtime": 1792178629.2083373,
-    "seen": 1792178817.6389976,
-    "ast_hash": "3160863c229cc4b8ebcbf27f8ab4f2c1",
+    "mtime": 1792328072.009085,
+    "seen": 1792335429.8564305,
+    "ast_hash": "f67fd0a0233e4e513e28a71f8d8eedc6",
     "semantic_hash": ""
   },
   "src/pages/Inventory.jsx": {
@@ -120,21 +120,21 @@
     "semantic_hash": ""
   },
   "src/pages/Salary.jsx": {
-    "mtime": 1792178653.0035257,
-    "seen": 1792178817.639009,
-    "ast_hash": "f1b3cbafdcd8a8ec1172799e17c0ae49",
+    "mtime": 1792328091.404233,
+    "seen": 1792335429.8564374,
+    "ast_hash": "05d1934bbe97eb8a532c8753232cc905",
     "semantic_hash": ""
   },
   "src/pages/Settings.jsx": {
-    "mtime": 1792319645.5995073,
-    "seen": 1792319867.5700443,
-    "ast_hash": "5fcd102a76bb6b98f72f80862561ebda",
+    "mtime": 1792330238.4146273,
+    "seen": 1792335429.856439,
+    "ast_hash": "5ff6a17107e26f9aea7b5aafb7ed634a",
     "semantic_hash": ""
   },
   "src/pages/Transactions.jsx": {
-    "mtime": 1792178688.068803,
-    "seen": 1792178817.6390142,
-    "ast_hash": "9c7d619987232f8d2dd340c403cb0d52",
+    "mtime": 1792328142.6916246,
+    "seen": 1792335429.8564405,
+    "ast_hash": "05b6fb1a55ac716e3bfb11b4c4a5c2d3",
     "semantic_hash": ""
   },
   "src/utils.js": {
@@ -276,9 +276,9 @@
     "semantic_hash": ""
   },
   "src/pages/Commissions.jsx": {
-    "mtime": 1792178676.0437078,
-    "seen": 1792178817.6389892,
-    "ast_hash": "4a40ec375f7c9e8199639366432ce5fe",
+    "mtime": 1792328123.3264768,
+    "seen": 1792335429.8564255,
+    "ast_hash": "958d8e8019d77f304e8045caf06b2b3c",
     "semantic_hash": ""
   },
   "src/components/PinLock.jsx": {
@@ -288,9 +288,9 @@
     "semantic_hash": ""
   },
   "src/pages/AdminDashboard.jsx": {
-    "mtime": 1792323295.0678103,
-    "seen": 1792323868.8310382,
-    "ast_hash": "8806328fb6001a1f6ad42f04ef446e41",
+    "mtime": 1792328663.4976063,
+    "seen": 1792335429.8564239,
+    "ast_hash": "30a331ca40672d7611f9c0734b1346cd",
     "semantic_hash": ""
   },
   "src/components/admin/AdminCharts.jsx": {
@@ -300,9 +300,9 @@
     "semantic_hash": ""
   },
   "src/components/admin/AdminKpiGrid.jsx": {
-    "mtime": 1792272540.6873772,
-    "seen": 1792272737.9652476,
-    "ast_hash": "8c8c514e3fcbbfdfac12e51a9aa2430b",
+    "mtime": 1792328289.716747,
+    "seen": 1792335429.8564062,
+    "ast_hash": "5e7bca1361398b4189c54ed6b7388f61",
     "semantic_hash": ""
   },
   "src/components/admin/AdminModals.jsx": {
@@ -312,9 +312,9 @@
     "semantic_hash": ""
   },
   "src/components/admin/AdminOverviewPnL.jsx": {
-    "mtime": 1792233066.9453518,
-    "seen": 1792233715.1260777,
-    "ast_hash": "c8053511df7d35a00bfd73fe3d234382",
+    "mtime": 1792330097.226558,
+    "seen": 1792335429.8564098,
+    "ast_hash": "5d7f6f707b6da8d409b1cc3eeaea7952",
     "semantic_hash": ""
   },
   "src/components/admin/AdminPayrollAuditTables.jsx": {
@@ -324,15 +324,15 @@
     "semantic_hash": ""
   },
   "src/components/admin/AdminReportsModule.jsx": {
-    "mtime": 1792233536.0969832,
-    "seen": 1792233715.1260846,
-    "ast_hash": "d32834d6c4814d66f901527946b36800",
+    "mtime": 1792328319.8359768,
+    "seen": 1792335429.8564136,
+    "ast_hash": "5a9c3a99ccce17664e6b9fec899ab7fd",
     "semantic_hash": ""
   },
   "src/components/admin/AdminSalesInventoryTables.jsx": {
-    "mtime": 1792233434.1131938,
-    "seen": 1792233715.126088,
-    "ast_hash": "779ed11d043f9f5f6a398b802f31d353",
+    "mtime": 1792328734.9561548,
+    "seen": 1792335429.8564155,
+    "ast_hash": "6bfdabcaecb43ee3d52bab6466881432",
     "semantic_hash": ""
   },
   "src/components/admin/adminUtils.js": {
@@ -342,9 +342,9 @@
     "semantic_hash": ""
   },
   "src/components/admin/useAdminController.js": {
-    "mtime": 1792321497.5475473,
-    "seen": 1792322722.1989279,
-    "ast_hash": "3156489400627f901b7f5f4177827f9c",
+    "mtime": 1792330075.9563968,
+    "seen": 1792335429.8564188,
+    "ast_hash": "a8518d5d27fbd0b823c9fb129a6b5347",
     "semantic_hash": ""
   },
   "src-tauri/src/cmds/auth.rs": {
@@ -360,9 +360,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/cmds/dashboard.rs": {
-    "mtime": 1792322349.006673,
-    "seen": 1792322722.1988885,
-    "ast_hash": "003f42672aaae93851e2f7f0b42285c7",
+    "mtime": 1792330061.5692878,
+    "seen": 1792335429.85637,
+    "ast_hash": "adaacc92063f02c01ffc1bc625a402ac",
     "semantic_hash": ""
   },
   "src-tauri/src/cmds/employees.rs": {
@@ -390,9 +390,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/cmds/sales.rs": {
-    "mtime": 1792323310.9089298,
-    "seen": 1792323868.830904,
-    "ast_hash": "d2098b5f4c79ea07d761afe0b2b50f16",
+    "mtime": 1792328026.1287348,
+    "seen": 1792335429.856381,
+    "ast_hash": "48ce053c75f43d945164c5494f17691c",
     "semantic_hash": ""
   },
   "src-tauri/src/cmds/shifts.rs": {
@@ -405,6 +405,12 @@
     "mtime": 1792322247.6229277,
     "seen": 1792322722.1988983,
     "ast_hash": "2034ce0870fd37b8797bbeb4b0474f78",
+    "semantic_hash": ""
+  },
+  "src/components/DashboardCrudModule.jsx": {
+    "mtime": 1792328775.875469,
+    "seen": 1792335429.8563995,
+    "ast_hash": "d66836c16703ba3270c3bc8dade8875e",
     "semantic_hash": ""
   }
 }

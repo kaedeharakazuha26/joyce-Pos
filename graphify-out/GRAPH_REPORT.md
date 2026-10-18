@@ -1,17 +1,17 @@
 # Graph Report - Joy-Pos-Multiplatform  (2026-10-18)
 
 ## Corpus Check
-- 49 files · ~135,568 words
+- 50 files · ~140,605 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .icns 1, .ico 1)
 
 ## Summary
-- 390 nodes · 1276 edges · 23 communities (13 shown, 10 thin omitted)
+- 393 nodes · 1310 edges · 25 communities (16 shown, 9 thin omitted)
 - Extraction: 92% EXTRACTED · 8% INFERRED · 0% AMBIGUOUS · INFERRED: 108 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `7bb35128`
+- Built from commit: `56a50d16`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -24,10 +24,13 @@
 - App.jsx
 - ymd
 - db.rs
+- common
 - default.json
 - set-version.mjs
 - joyce-pos
 - adminUtils.js
+- auth.rs
+- AdminModals.jsx
 - JOYCE POS
 - rows
 - Db
@@ -35,32 +38,32 @@
 
 ## God Nodes (most connected - your core abstractions)
 1. `Db` - 68 edges
-2. `ymd()` - 42 edges
-3. `peso()` - 38 edges
-4. `rows()` - 35 edges
-5. `Empty()` - 33 edges
-6. `errText()` - 31 edges
-7. `log_audit()` - 30 edges
-8. `Modal()` - 26 edges
-9. `useToast()` - 23 edges
-10. `lucide-react` - 23 edges
+2. `ymd()` - 45 edges
+3. `peso()` - 40 edges
+4. `Empty()` - 35 edges
+5. `rows()` - 35 edges
+6. `errText()` - 33 edges
+7. `Modal()` - 30 edges
+8. `log_audit()` - 30 edges
+9. `useToast()` - 25 edges
+10. `lucide-react` - 24 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `What is Graphify?` --references--> `ymd()`  [INFERRED]
   README.md → src/utils.js
-- `sale_detail()` --calls--> `rows()`  [INFERRED]
-  src-tauri/src/cmds/sales.rs → src-tauri/src/cmds/common.rs
-- `create_sale()` --calls--> `get_active_shift()`  [INFERRED]
-  src-tauri/src/cmds/sales.rs → src-tauri/src/cmds/common.rs
-- `create_sale()` --calls--> `log_audit()`  [INFERRED]
-  src-tauri/src/cmds/sales.rs → src-tauri/src/cmds/common.rs
-- `create_sale()` --calls--> `r2()`  [INFERRED]
-  src-tauri/src/cmds/sales.rs → src-tauri/src/cmds/common.rs
+- `dashboard()` --calls--> `rows()`  [INFERRED]
+  src-tauri/src/cmds/dashboard.rs → src-tauri/src/cmds/common.rs
+- `dashboard()` --calls--> `scalar()`  [INFERRED]
+  src-tauri/src/cmds/dashboard.rs → src-tauri/src/cmds/common.rs
+- `build_activity_feed()` --calls--> `rows()`  [INFERRED]
+  src-tauri/src/cmds/dashboard.rs → src-tauri/src/cmds/common.rs
+- `list_audit_logs()` --calls--> `build_activity_feed()`  [INFERRED]
+  src-tauri/src/cmds/system.rs → src-tauri/src/cmds/dashboard.rs
 
 ## Import Cycles
 - None detected.
 
-## Communities (23 total, 10 thin omitted)
+## Communities (25 total, 9 thin omitted)
 
 ### Community 1 - "package.json"
 Cohesion: 0.07
@@ -75,55 +78,67 @@ Cohesion: 0.11
 Nodes (17): app, security, windows, build, beforeBuildCommand, beforeDevCommand, devUrl, frontendDist (+9 more)
 
 ### Community 4 - "ui.jsx"
-Cohesion: 0.31
-Nodes (19): lucide-react, react, AdminChartsSection(), InteractiveDoughnutChart(), InteractiveTrendChart(), AdminAlertsAndActivity(), AdminKpiGrid(), AdminOverviewPnL() (+11 more)
+Cohesion: 0.38
+Nodes (12): lucide-react, AdminAlertsAndActivity(), AdminKpiGrid(), AdminOverviewPnL(), TablePagination(), AdminPayrollAuditTables(), AdminReportsModule(), AdminSalesInventoryTables() (+4 more)
 
 ### Community 5 - "App.jsx"
-Cohesion: 0.18
-Nodes (33): api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx, useSettings(), AdminCrudModals(), PinLock() (+25 more)
+Cohesion: 0.20
+Nodes (34): react, api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx, useSettings(), DashboardCrudModule() (+26 more)
 
 ### Community 6 - "ymd"
-Cohesion: 0.34
-Nodes (17): RangeBar(), ToastCtx, Dashboard(), Stat(), blank(), Expenses(), daysAgo(), lastMonthRange() (+9 more)
+Cohesion: 0.36
+Nodes (16): RangeBar(), ToastCtx, Commission(), CommissionBase(), LDCommission(), daysAgo(), lastMonthRange(), lastWeekRange() (+8 more)
 
 ### Community 7 - "db.rs"
 Cohesion: 0.14
 Nodes (5): BranchConfig, BranchInfo, BranchState, init(), init_branch_state()
+
+### Community 8 - "common"
+Cohesion: 0.15
+Nodes (4): r2(), admin_dashboard(), build_activity_feed(), dashboard()
 
 ### Community 9 - "default.json"
 Cohesion: 0.33
 Nodes (5): description, identifier, permissions, $schema, windows
 
 ### Community 14 - "adminUtils.js"
-Cohesion: 0.31
-Nodes (8): buildExcelHtml(), buildExportDataset(), CHART_COLORS, EXPENSE_CATEGORIES, REPORT_TABS, useAdminController(), DATE_PRESETS, downloadBlob()
+Cohesion: 0.26
+Nodes (13): AdminChartsSection(), InteractiveDoughnutChart(), InteractiveTrendChart(), aggregateDailySeries(), buildExcelHtml(), buildExportDataset(), CHART_COLORS, REPORT_TABS (+5 more)
+
+### Community 15 - "auth.rs"
+Cohesion: 0.56
+Nodes (5): change_admin_pin(), delete_cashier(), list_cashiers(), save_cashier(), verify_pin()
+
+### Community 16 - "AdminModals.jsx"
+Cohesion: 0.60
+Nodes (4): AdminCrudModals(), EXPENSE_CATEGORIES, ConfirmModal(), Receipt()
 
 ### Community 20 - "JOYCE POS"
 Cohesion: 0.05
 Nodes (39): 1. Variant-Aware Inventory Deduction, 2. Shift Cash Reconciliation (SOD & EOD), 3. Native Thermal Printer Pipeline, 4. Multi-Branch Isolation, Architecture & How It Works, Automated Git Hooks, Backup & Disaster Recovery, Building for Production (+31 more)
 
 ### Community 21 - "rows"
-Cohesion: 0.09
-Nodes (48): change_admin_pin(), delete_cashier(), list_cashiers(), save_cashier(), verify_pin(), active_business_date(), business_now(), get_active_shift() (+40 more)
+Cohesion: 0.12
+Nodes (33): active_business_date(), business_now(), get_active_shift(), log_audit(), now(), num(), rows(), scalar() (+25 more)
 
 ### Community 23 - "Db"
-Cohesion: 0.28
-Nodes (17): backup_db(), branch_info_json(), create_branch(), delete_branch(), get_branch_info(), get_settings(), global_search(), list_audit_logs() (+9 more)
+Cohesion: 0.16
+Nodes (26): list_usb_devices(), print_receipt(), print_test(), end_day(), get_shift_status(), list_shifts(), start_day(), update_shift_notes() (+18 more)
 
 ### Community 26 - "sales.rs"
-Cohesion: 0.27
-Nodes (8): list_usb_devices(), print_receipt(), print_test(), create_sale(), list_sales(), list_voided(), sale_detail(), void_sale()
+Cohesion: 0.53
+Nodes (5): create_sale(), list_sales(), list_voided(), sale_detail(), void_sale()
 
 ## Knowledge Gaps
 - **2 isolated node(s):** `@tauri-apps/cli`, `joyce-pos`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 115 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **10 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 116 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Db` connect `rows` to `sales.rs`, `db.rs`, `Db`?**
-  _High betweenness centrality (0.098) - this node is a cross-community bridge._
+- **Why does `Db` connect `Db` to `db.rs`, `common`, `auth.rs`, `rows`, `sales.rs`?**
+  _High betweenness centrality (0.097) - this node is a cross-community bridge._
 - **Are the 30 inferred relationships involving `rows()` (e.g. with `delete_cashier()` and `list_cashiers()`) actually correct?**
   _`rows()` has 30 INFERRED edges - model-reasoned connections that need verification._
 - **What connects `@tauri-apps/cli`, `joyce-pos` to the rest of the system?**
@@ -131,7 +146,7 @@ _Questions this graph is uniquely positioned to answer:_
 - **Should `package.json` be split into smaller, more focused modules?**
   _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
 - **Why does `ymd()` connect `ymd` to `ui.jsx`, `JOYCE POS`, `App.jsx`, `adminUtils.js`?**
-  _High betweenness centrality (0.083) - this node is a cross-community bridge._
+  _High betweenness centrality (0.084) - this node is a cross-community bridge._
 - **Should `tauri.conf.json` be split into smaller, more focused modules?**
   _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._
 - **Should `db.rs` be split into smaller, more focused modules?**
