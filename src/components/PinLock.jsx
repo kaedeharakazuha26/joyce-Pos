@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import {
   Lock,
   KeyRound,
@@ -17,6 +17,115 @@ import {
 import { api } from "../api";
 import { errText } from "../utils";
 
+// ── High-Performance Ambient & Particle Background (Memoized) ──
+// Isolated completely from PIN typing and input mode state updates to prevent re-renders
+const LoginBackground = memo(function LoginBackground({ isDark }) {
+  const canvasRef = useRef(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d", { alpha: true });
+    if (!ctx) return;
+
+    let animId;
+    let width = (canvas.width = window.innerWidth);
+    let height = (canvas.height = window.innerHeight);
+
+    const handleResize = () => {
+      if (!canvas) return;
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    };
+    window.addEventListener("resize", handleResize, { passive: true });
+
+    // Streamlined particle count for 0% CPU consumption
+    const count = Math.min(20, Math.max(10, Math.floor(width / 75)));
+    const particles = Array.from({ length: count }, () => ({
+      x: Math.random() * width,
+      y: Math.random() * height,
+      vx: (Math.random() - 0.5) * 0.35,
+      vy: (Math.random() - 0.5) * 0.35,
+      size: Math.random() * 2 + 1,
+    }));
+
+    let lastTime = 0;
+    // Cap to ~35fps for ambient background to keep CPU usage virtually 0%
+    const frameInterval = 1000 / 35;
+
+    const render = (time) => {
+      animId = requestAnimationFrame(render);
+
+      const delta = time - lastTime;
+      if (delta < frameInterval) return;
+      lastTime = time - (delta % frameInterval);
+
+      ctx.clearRect(0, 0, width, height);
+
+      // 1. Batch draw all particles in a single path
+      ctx.beginPath();
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0) p.x = width;
+        if (p.x > width) p.x = 0;
+        if (p.y < 0) p.y = height;
+        if (p.y > height) p.y = 0;
+
+        ctx.moveTo(p.x + p.size, p.y);
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = isDark ? "rgba(212, 175, 55, 0.45)" : "rgba(184, 138, 40, 0.4)";
+      ctx.fill();
+
+      // 2. Batch draw connections in a single path (max 20 lines)
+      ctx.beginPath();
+      let linesDrawn = 0;
+      for (let i = 0; i < particles.length && linesDrawn < 20; i++) {
+        const p1 = particles[i];
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          const dx = p1.x - p2.x;
+          const dy = p1.y - p2.y;
+          if (Math.abs(dx) < 85 && Math.abs(dy) < 85) {
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 85) {
+              ctx.moveTo(p1.x, p1.y);
+              ctx.lineTo(p2.x, p2.y);
+              linesDrawn++;
+              if (linesDrawn >= 20) break;
+            }
+          }
+        }
+      }
+      ctx.strokeStyle = isDark ? "rgba(212, 175, 55, 0.12)" : "rgba(184, 138, 40, 0.1)";
+      ctx.lineWidth = 0.75;
+      ctx.stroke();
+    };
+
+    animId = requestAnimationFrame(render);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [isDark]);
+
+  return (
+    <>
+      <canvas ref={canvasRef} className="login-particle-canvas" />
+      <div className="login-ambient-elements" aria-hidden="true">
+        <div className="moving-gold-orb orb-primary" />
+        <div className="moving-gold-orb orb-secondary" />
+        <div className="moving-gold-orb orb-tertiary" />
+        <div className="moving-orbital-ring ring-outer" />
+        <div className="moving-orbital-ring ring-inner" />
+      </div>
+    </>
+  );
+});
+
 export default function PinLock({
   onUnlock,
   settings = {},
@@ -31,130 +140,27 @@ export default function PinLock({
   const [showPassword, setShowPassword] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const directInputRef = useRef(null);
-  const canvasRef = useRef(null);
 
-  // Read active theme (black-gold or white-gold)
+  // Synchronized refs to avoid re-binding keydown event listeners on every keystroke
+  const pinRef = useRef(pin);
+  pinRef.current = pin;
+  const loadingRef = useRef(loading);
+  loadingRef.current = loading;
+  const inputModeRef = useRef(inputMode);
+  inputModeRef.current = inputMode;
+
+  // Active theme calculation
   const currentTheme =
     document.documentElement.dataset.theme ||
     localStorage.getItem("joyce-theme") ||
     settings?.theme ||
     "dark";
+  const isDark = currentTheme === "dark";
 
-  // ── Particle & Moving Objects Animation Canvas ──
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    let animId;
-    let width = (canvas.width = window.innerWidth);
-    let height = (canvas.height = window.innerHeight);
-
-    const handleResize = () => {
-      if (!canvas) return;
-      width = canvas.width = window.innerWidth;
-      height = canvas.height = window.innerHeight;
-    };
-    window.addEventListener("resize", handleResize);
-
-    // Golden dust particles
-    const particleCount = Math.min(50, Math.floor((width * height) / 22000));
-    const isDark = (document.documentElement.dataset.theme || currentTheme) === "dark";
-
-    const particles = Array.from({ length: particleCount }).map(() => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      vx: (Math.random() - 0.5) * 0.45,
-      vy: (Math.random() - 0.5) * 0.45,
-      size: Math.random() * 2.8 + 1,
-      alpha: Math.random() * 0.6 + 0.2,
-      baseAlpha: Math.random() * 0.5 + 0.2,
-      phase: Math.random() * Math.PI * 2,
-      goldHue: isDark
-        ? Math.random() > 0.4
-          ? "rgba(212, 175, 55, "
-          : "rgba(247, 212, 104, "
-        : "rgba(184, 138, 40, ",
-    }));
-
-    // Interactive mouse position
-    let mouse = { x: -1000, y: -1000 };
-    const handleMouseMove = (e) => {
-      mouse.x = e.clientX;
-      mouse.y = e.clientY;
-    };
-    window.addEventListener("mousemove", handleMouseMove);
-
-    let time = 0;
-    const render = () => {
-      time += 0.015;
-      ctx.clearRect(0, 0, width, height);
-
-      // Draw and update particles
-      for (let i = 0; i < particles.length; i++) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-
-        // Wrap edges
-        if (p.x < 0) p.x = width;
-        if (p.x > width) p.x = 0;
-        if (p.y < 0) p.y = height;
-        if (p.y > height) p.y = 0;
-
-        // Mouse gentle repulsion
-        const dx = mouse.x - p.x;
-        const dy = mouse.y - p.y;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < 120) {
-          const force = (120 - dist) / 120;
-          p.x -= (dx / dist) * force * 1.5;
-          p.y -= (dy / dist) * force * 1.5;
-        }
-
-        // Pulse alpha
-        const dynamicAlpha = Math.sin(time + p.phase) * 0.2 + p.baseAlpha;
-
-        // Draw particle
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `${p.goldHue}${Math.max(0.1, Math.min(1, dynamicAlpha))})`;
-        ctx.fill();
-
-        // Connect nearby particles with subtle golden filaments
-        for (let j = i + 1; j < particles.length; j++) {
-          const p2 = particles[j];
-          const dist2 = Math.hypot(p.x - p2.x, p.y - p2.y);
-          if (dist2 < 95) {
-            const lineAlpha = (1 - dist2 / 95) * (isDark ? 0.16 : 0.12);
-            ctx.beginPath();
-            ctx.moveTo(p.x, p.y);
-            ctx.lineTo(p2.x, p2.y);
-            ctx.strokeStyle = isDark
-              ? `rgba(212, 175, 55, ${lineAlpha})`
-              : `rgba(184, 138, 40, ${lineAlpha})`;
-            ctx.lineWidth = 0.75;
-            ctx.stroke();
-          }
-        }
-      }
-
-      animId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener("resize", handleResize);
-      window.removeEventListener("mousemove", handleMouseMove);
-    };
-  }, [currentTheme]);
-
-  // ── Authentication Submission ──
+  // Stable authentication submission
   const submit = useCallback(
-    async (p = pin) => {
+    async (overridePin) => {
+      const p = overridePin !== undefined ? overridePin : pinRef.current;
       if (!p || p.length < 4) {
         setErr("PIN must be at least 4 digits");
         return;
@@ -167,44 +173,42 @@ export default function PinLock({
       } catch (e) {
         setErr(errText(e));
         setPin("");
-        if (inputMode === "direct" && directInputRef.current) {
+        if (inputModeRef.current === "direct" && directInputRef.current) {
           directInputRef.current.focus();
         }
       } finally {
         setLoading(false);
       }
     },
-    [pin, inputMode, onUnlock]
+    [onUnlock]
   );
 
-  const press = (digit) => {
-    if (loading) return;
-    if (pin.length < 10) {
-      setPin((prev) => prev + digit);
-      setErr("");
-    }
-  };
+  const press = useCallback((digit) => {
+    if (loadingRef.current) return;
+    setPin((prev) => (prev.length < 10 ? prev + digit : prev));
+    setErr("");
+  }, []);
 
-  const backspace = () => {
-    if (loading) return;
+  const backspace = useCallback(() => {
+    if (loadingRef.current) return;
     setPin((p) => p.slice(0, -1));
     setErr("");
-  };
+  }, []);
 
-  const clear = () => {
-    if (loading) return;
+  const clear = useCallback(() => {
+    if (loadingRef.current) return;
     setPin("");
     setErr("");
-  };
+  }, []);
 
-  // Keyboard controls
+  // Stable Keyboard controls (registered ONCE on mount)
   useEffect(() => {
     const handleKey = (e) => {
-      // If typing inside direct input field, let native events handle standard text
-      if (inputMode === "direct" && document.activeElement === directInputRef.current) {
+      // If typing inside direct input field, let native input handle alphanumeric keys
+      if (inputModeRef.current === "direct" && document.activeElement === directInputRef.current) {
         if (e.key === "Enter") {
           e.preventDefault();
-          submit(pin);
+          submit(pinRef.current);
         } else if (e.key === "Escape") {
           clear();
         }
@@ -218,35 +222,21 @@ export default function PinLock({
       } else if (e.key === "Escape" || e.key === "Delete") {
         clear();
       } else if (e.key === "Enter") {
-        submit(pin);
+        submit(pinRef.current);
       }
     };
+
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [pin, loading, inputMode, submit]);
-
-  useEffect(() => {
-    if (inputMode === "direct" && directInputRef.current) {
-      directInputRef.current.focus();
-    }
-  }, [inputMode]);
+  }, [submit, press, backspace, clear]);
 
   const digits = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "C", "0", "⌫"];
   const dotCount = Math.max(6, pin.length);
 
   return (
     <div className="login-stage">
-      {/* ── Dynamic Moving Objects: Interactive Gold Particle Canvas ── */}
-      <canvas ref={canvasRef} className="login-particle-canvas" />
-
-      {/* ── Dynamic Moving Objects: Ambient Golden Luxury Orbs & Rings ── */}
-      <div className="login-ambient-elements" aria-hidden="true">
-        <div className="moving-gold-orb orb-primary" />
-        <div className="moving-gold-orb orb-secondary" />
-        <div className="moving-gold-orb orb-tertiary" />
-        <div className="moving-orbital-ring ring-outer" />
-        <div className="moving-orbital-ring ring-inner" />
-      </div>
+      {/* ── Dynamic Moving Objects: Memoized Isolated Background ── */}
+      <LoginBackground isDark={isDark} />
 
       {/* ── Top Bar Controls: Shift Status & Quick Theme Toggle ── */}
       <header className="login-top-bar">
@@ -284,7 +274,7 @@ export default function PinLock({
         )}
       </header>
 
-      {/* ── Main Glassmorphic Login Card ── */}
+      {/* ── Main Login Card ── */}
       <main className="login-card-container">
         <div className="login-card">
           {/* Card Header & Brand Emblem */}
@@ -328,96 +318,102 @@ export default function PinLock({
             <button
               type="button"
               className={`mode-tab ${inputMode === "direct" ? "active" : ""}`}
-              onClick={() => setInputMode("direct")}
+              onClick={() => {
+                setInputMode("direct");
+                setTimeout(() => directInputRef.current?.focus(), 10);
+              }}
             >
               <Lock size={14} /> Direct Input
             </button>
           </div>
 
-          {/* PIN Indicators or Direct Input Field */}
-          {inputMode === "keypad" ? (
-            <div className="keypad-input-area">
-              <div className={"pin-dots-container" + (err ? " shake" : "")}>
-                {Array.from({ length: dotCount }).map((_, i) => (
-                  <span
-                    key={i}
-                    className={"pin-bubble" + (pin.length > i ? " filled" : "")}
-                  />
-                ))}
-              </div>
-
-              {err && (
-                <div className="login-error-banner" role="alert">
-                  {err}
-                </div>
-              )}
-
-              {/* Touch Keypad Grid */}
-              <div className="login-keypad-grid">
-                {digits.map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    className={
-                      "keypad-key" +
-                      (d === "C" || d === "⌫" ? " fn-key" : "") +
-                      (d === "0" ? " zero-key" : "")
-                    }
-                    onClick={() => {
-                      if (d === "C") clear();
-                      else if (d === "⌫") backspace();
-                      else press(d);
-                    }}
-                    disabled={loading}
-                  >
-                    {d === "⌫" ? <Delete size={20} /> : d}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <form
-              className="direct-input-area"
-              onSubmit={(e) => {
-                e.preventDefault();
-                submit(pin);
-              }}
-            >
-              <div className="direct-input-wrapper">
-                <Lock size={18} className="input-leading-icon" />
-                <input
-                  ref={directInputRef}
-                  id="direct-pin-input"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter Security PIN…"
-                  value={pin}
-                  onChange={(e) => {
-                    setPin(e.target.value.replace(/\D/g, ""));
-                    setErr("");
-                  }}
-                  maxLength={10}
-                  disabled={loading}
-                  autoComplete="off"
-                  className={err ? "input-has-error" : ""}
+          {/* Touch Keypad Area (Persistent in DOM for 0ms tab switching) */}
+          <div
+            className="keypad-input-area"
+            style={{ display: inputMode === "keypad" ? "block" : "none" }}
+          >
+            <div className={"pin-dots-container" + (err ? " shake" : "")}>
+              {Array.from({ length: dotCount }).map((_, i) => (
+                <span
+                  key={i}
+                  className={"pin-bubble" + (pin.length > i ? " filled" : "")}
                 />
-                <button
-                  type="button"
-                  className="input-eye-btn"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  tabIndex={-1}
-                  title={showPassword ? "Hide PIN" : "Show PIN"}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+              ))}
+            </div>
 
-              {err && (
-                <div className="login-error-banner" role="alert">
-                  {err}
-                </div>
-              )}
-            </form>
-          )}
+            {err && (
+              <div className="login-error-banner" role="alert">
+                {err}
+              </div>
+            )}
+
+            {/* Touch Keypad Grid */}
+            <div className="login-keypad-grid">
+              {digits.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={
+                    "keypad-key" +
+                    (d === "C" || d === "⌫" ? " fn-key" : "") +
+                    (d === "0" ? " zero-key" : "")
+                  }
+                  onClick={() => {
+                    if (d === "C") clear();
+                    else if (d === "⌫") backspace();
+                    else press(d);
+                  }}
+                  disabled={loading}
+                >
+                  {d === "⌫" ? <Delete size={20} /> : d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Direct Keyboard Form (Persistent in DOM for 0ms tab switching) */}
+          <form
+            className="direct-input-area"
+            style={{ display: inputMode === "direct" ? "block" : "none" }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              submit(pin);
+            }}
+          >
+            <div className="direct-input-wrapper">
+              <Lock size={18} className="input-leading-icon" />
+              <input
+                ref={directInputRef}
+                id="direct-pin-input"
+                type={showPassword ? "text" : "password"}
+                placeholder="Enter Security PIN…"
+                value={pin}
+                onChange={(e) => {
+                  setPin(e.target.value.replace(/\D/g, ""));
+                  setErr("");
+                }}
+                maxLength={10}
+                disabled={loading}
+                autoComplete="off"
+                className={err ? "input-has-error" : ""}
+              />
+              <button
+                type="button"
+                className="input-eye-btn"
+                onClick={() => setShowPassword((prev) => !prev)}
+                tabIndex={-1}
+                title={showPassword ? "Hide PIN" : "Show PIN"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+
+            {err && (
+              <div className="login-error-banner" role="alert">
+                {err}
+              </div>
+            )}
+          </form>
 
           {/* Unlock Submit Button */}
           <button
