@@ -84,9 +84,9 @@
     "semantic_hash": ""
   },
   "src/main.jsx": {
-    "mtime": 1792166444.8303185,
-    "seen": 1792166721.774805,
-    "ast_hash": "f4f4bd133dc09112ca61ab4b7c79dfeb",
+    "mtime": 1792344388.6860194,
+    "seen": 1792344631.8464901,
+    "ast_hash": "ab130021aa39c6528759211895c67e0f",
     "semantic_hash": ""
   },
   "src/pages/Dashboard.jsx": {
@@ -264,9 +264,9 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792234333.5422003,
-    "seen": 1792234347.1731813,
-    "ast_hash": "32465f845bd03054ca8c62e00aee9650",
+    "mtime": 1792344609.7967093,
+    "seen": 1792344631.8465161,
+    "ast_hash": "2038e112ffbce0ce74ccd0b7e4cd2aee",
     "semantic_hash": ""
   },
   "src/pages/Employees.jsx": {
