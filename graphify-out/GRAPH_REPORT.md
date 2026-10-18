@@ -1,17 +1,17 @@
 # Graph Report - Joy-Pos-Multiplatform  (2026-10-18)
 
 ## Corpus Check
-- 39 files · ~135,138 words
+- 39 files · ~134,410 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 2, .icns 1, .ico 1)
 
 ## Summary
-- 336 nodes · 1196 edges · 16 communities (9 shown, 7 thin omitted)
+- 332 nodes · 1159 edges · 17 communities (9 shown, 8 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 14 edges (avg confidence: 0.86)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `5e143ed4`
+- Built from commit: `3a6c29e4`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -30,13 +30,13 @@
 - JOYCE POS
 
 ## God Nodes (most connected - your core abstractions)
-1. `Db` - 60 edges
+1. `Db` - 55 edges
 2. `ymd()` - 40 edges
 3. `peso()` - 38 edges
-4. `rows()` - 35 edges
-5. `Empty()` - 33 edges
-6. `errText()` - 31 edges
-7. `log_audit()` - 30 edges
+4. `Empty()` - 33 edges
+5. `errText()` - 31 edges
+6. `rows()` - 29 edges
+7. `log_audit()` - 26 edges
 8. `Modal()` - 26 edges
 9. `useToast()` - 23 edges
 10. `lucide-react` - 23 edges
@@ -46,17 +46,17 @@
   README.md → src/utils.js
 - `send_usb()` --calls--> `e()`  [INFERRED]
   src-tauri/src/printer.rs → src-tauri/src/cmds.rs
-- `AdminDashboard()` --calls--> `useSettings()`  [EXTRACTED]
-  src/pages/AdminDashboard.jsx → src/App.jsx
-- `AdminKpiGrid()` --calls--> `monthStart()`  [EXTRACTED]
-  src/components/admin/AdminKpiGrid.jsx → src/utils.js
-- `AdminKpiGrid()` --calls--> `peso()`  [EXTRACTED]
-  src/components/admin/AdminKpiGrid.jsx → src/utils.js
+- `AdminChartsSection()` --calls--> `Empty()`  [EXTRACTED]
+  src/components/admin/AdminCharts.jsx → src/components/ui.jsx
+- `AdminChartsSection()` --calls--> `peso()`  [EXTRACTED]
+  src/components/admin/AdminCharts.jsx → src/utils.js
+- `InteractiveDoughnutChart()` --calls--> `Empty()`  [EXTRACTED]
+  src/components/admin/AdminCharts.jsx → src/components/ui.jsx
 
 ## Import Cycles
 - 2-file cycle: `src-tauri/src/cmds.rs -> src-tauri/src/printer.rs -> src-tauri/src/cmds.rs`
 
-## Communities (16 total, 7 thin omitted)
+## Communities (17 total, 8 thin omitted)
 
 ### Community 1 - "package.json"
 Cohesion: 0.07
@@ -71,20 +71,20 @@ Cohesion: 0.11
 Nodes (17): app, security, windows, build, beforeBuildCommand, beforeDevCommand, devUrl, frontendDist (+9 more)
 
 ### Community 4 - "ui.jsx"
-Cohesion: 0.17
-Nodes (26): lucide-react, AdminChartsSection(), InteractiveDoughnutChart(), InteractiveTrendChart(), AdminAlertsAndActivity(), AdminKpiGrid(), AdminCrudModals(), AdminOverviewPnL() (+18 more)
+Cohesion: 0.18
+Nodes (23): AdminChartsSection(), InteractiveDoughnutChart(), InteractiveTrendChart(), AdminAlertsAndActivity(), AdminKpiGrid(), AdminOverviewPnL(), TablePagination(), AdminPayrollAuditTables() (+15 more)
 
 ### Community 5 - "App.jsx"
 Cohesion: 0.16
-Nodes (50): react, api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx, useSettings(), PinLock() (+42 more)
+Nodes (53): lucide-react, react, api, App(), GATED_SHIFT_TABS, NAV, SettingsCtx, useSettings() (+45 more)
 
 ### Community 7 - "db.rs"
 Cohesion: 0.14
 Nodes (5): BranchConfig, BranchInfo, BranchState, init(), init_branch_state()
 
 ### Community 8 - "cmds.rs"
-Cohesion: 0.12
-Nodes (73): active_business_date(), add_commission_type(), admin_dashboard(), backup_db(), branch_info_json(), build_activity_feed(), business_now(), change_admin_pin() (+65 more)
+Cohesion: 0.13
+Nodes (68): active_business_date(), add_commission_type(), admin_dashboard(), backup_db(), branch_info_json(), build_activity_feed(), business_now(), change_admin_pin() (+60 more)
 
 ### Community 9 - "default.json"
 Cohesion: 0.33
@@ -96,23 +96,23 @@ Nodes (39): 1. Variant-Aware Inventory Deduction, 2. Shift Cash Reconciliation (
 
 ## Knowledge Gaps
 - **2 isolated node(s):** `@tauri-apps/cli`, `joyce-pos`
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 104 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 105 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `ymd()` connect `App.jsx` to `JOYCE POS`, `ui.jsx`?**
-  _High betweenness centrality (0.110) - this node is a cross-community bridge._
+  _High betweenness centrality (0.112) - this node is a cross-community bridge._
 - **What connects `@tauri-apps/cli`, `joyce-pos` to the rest of the system?**
   _2 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `package.json` be split into smaller, more focused modules?**
-  _Cohesion score 0.07407407407407407 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.06896551724137931 - nodes in this community are weakly interconnected._
 - **Why does `What is Graphify?` connect `JOYCE POS` to `App.jsx`?**
-  _High betweenness centrality (0.096) - this node is a cross-community bridge._
+  _High betweenness centrality (0.098) - this node is a cross-community bridge._
 - **Should `tauri.conf.json` be split into smaller, more focused modules?**
   _Cohesion score 0.1111111111111111 - nodes in this community are weakly interconnected._
 - **Should `db.rs` be split into smaller, more focused modules?**
   _Cohesion score 0.14210526315789473 - nodes in this community are weakly interconnected._
 - **Should `cmds.rs` be split into smaller, more focused modules?**
-  _Cohesion score 0.1219162363740677 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.12593313859136643 - nodes in this community are weakly interconnected._

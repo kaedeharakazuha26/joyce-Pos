@@ -30,9 +30,9 @@
     "semantic_hash": ""
   },
   "src-tauri/src/cmds.rs": {
-    "mtime": 1792272190.2628777,
-    "seen": 1792272737.9652045,
-    "ast_hash": "0e15634dc0901c863e27ef1e04267a07",
+    "mtime": 1792319865.5579965,
+    "seen": 1792319867.5699959,
+    "ast_hash": "58627d4898bb75135a45af0209240b95",
     "semantic_hash": ""
   },
   "src-tauri/src/db.rs": {
@@ -126,9 +126,9 @@
     "semantic_hash": ""
   },
   "src/pages/Settings.jsx": {
-    "mtime": 1792272333.0428963,
-    "seen": 1792272737.9653275,
-    "ast_hash": "2053a18006feaa3944a295f705eeb478",
+    "mtime": 1792319645.5995073,
+    "seen": 1792319867.5700443,
+    "ast_hash": "5fcd102a76bb6b98f72f80862561ebda",
     "semantic_hash": ""
   },
   "src/pages/Transactions.jsx": {
