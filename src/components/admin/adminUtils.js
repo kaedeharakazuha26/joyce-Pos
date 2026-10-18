@@ -125,7 +125,12 @@ export function buildExportDataset({
   filteredShifts,
   filteredAudit,
   daily = [],
+  disabledMenus = [],
 }) {
+  const showExpenses = !disabledMenus.includes("expenses");
+  const showSalary = !disabledMenus.includes("salary") && !disabledMenus.includes("salaries");
+  const showCommission = !disabledMenus.includes("commission") && !disabledMenus.includes("commissions");
+  const showLdCommission = !disabledMenus.includes("ld-commission") && !disabledMenus.includes("ld_commission");
   const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   if (reportTab === "sales") {
     return {
@@ -234,30 +239,29 @@ export function buildExportDataset({
     };
   }
   if (reportTab === "employees") {
+    const headers = [
+      "Employee Name",
+      "Role",
+      "Contact",
+      "Daily Rate",
+      "Date Hired",
+      ...(showSalary ? ["Salaries (Period)"] : []),
+      ...(showCommission ? ["Commissions (Period)"] : []),
+      ...(showLdCommission ? ["LD Drinks", "LD Total (Period)"] : []),
+      "Total Payout (Period)",
+    ];
     return {
       title: "Employee_Performance_and_Directory_Report",
-      headers: [
-        "Employee Name",
-        "Role",
-        "Contact",
-        "Daily Rate",
-        "Date Hired",
-        "Salaries (Period)",
-        "Commissions (Period)",
-        "LD Drinks",
-        "LD Total (Period)",
-        "Total Payout (Period)",
-      ],
+      headers,
       rows: filteredEmployees.map((e) => [
         e.name,
         e.role,
         e.contact,
         Number(e.daily_rate || 0).toFixed(2),
         e.hired_on,
-        Number(e.salary_total || 0).toFixed(2),
-        Number(e.commission_total || 0).toFixed(2),
-        e.ld_drinks,
-        Number(e.ld_total || 0).toFixed(2),
+        ...(showSalary ? [Number(e.salary_total || 0).toFixed(2)] : []),
+        ...(showCommission ? [Number(e.commission_total || 0).toFixed(2)] : []),
+        ...(showLdCommission ? [e.ld_drinks, Number(e.ld_total || 0).toFixed(2)] : []),
         Number(e.total_payout || 0).toFixed(2),
       ]),
       esc,
@@ -312,31 +316,33 @@ export function buildExportDataset({
     };
   }
 
+  const headers = [
+    "Date",
+    "Orders",
+    "Gross Sales",
+    "COGS",
+    "Gross Profit",
+    ...(showExpenses ? ["Expenses"] : []),
+    ...(showSalary ? ["Salaries"] : []),
+    ...(showCommission ? ["Commissions"] : []),
+    ...(showLdCommission ? ["LD Commissions"] : []),
+    "Total Overheads",
+    "Net Operating Profit",
+  ];
+
   return {
     title: "Executive_PnL_and_Daily_Financial_Report",
-    headers: [
-      "Date",
-      "Orders",
-      "Gross Sales",
-      "COGS",
-      "Gross Profit",
-      "Expenses",
-      "Salaries",
-      "Commissions",
-      "LD Commissions",
-      "Total Overheads",
-      "Net Operating Profit",
-    ],
+    headers,
     rows: daily.map((d) => [
       d.day,
       d.orders,
       Number(d.revenue || 0).toFixed(2),
       Number(d.cogs || 0).toFixed(2),
       Number(d.gross_profit || 0).toFixed(2),
-      Number(d.expenses || 0).toFixed(2),
-      Number(d.salaries || 0).toFixed(2),
-      Number(d.commissions || 0).toFixed(2),
-      Number(d.ld_commissions || 0).toFixed(2),
+      ...(showExpenses ? [Number(d.expenses || 0).toFixed(2)] : []),
+      ...(showSalary ? [Number(d.salaries || 0).toFixed(2)] : []),
+      ...(showCommission ? [Number(d.commissions || 0).toFixed(2)] : []),
+      ...(showLdCommission ? [Number(d.ld_commissions || 0).toFixed(2)] : []),
       Number(d.total_overheads || 0).toFixed(2),
       Number(d.net_profit || 0).toFixed(2),
     ]),

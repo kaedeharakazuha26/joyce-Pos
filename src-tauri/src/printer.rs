@@ -85,6 +85,152 @@ pub fn build_receipt(sale: &Value, st: &Settings) -> Vec<u8> {
     b
 }
 
+/// Builds ESC/POS bytes for an End of Day (Z-Reading) thermal receipt.
+pub fn build_z_reading(shift: &Value, st: &Settings, closing_cash: f64, closing_notes: &str) -> Vec<u8> {
+    let paper = g(st, "paper_width", "58");
+    let w: usize = g(st, "chars_per_line", if paper == "80" { "48" } else { "32" }).parse().unwrap_or(32);
+    let line = "-".repeat(w) + "\n";
+    let dline = "=".repeat(w) + "\n";
+    let mut b: Vec<u8> = vec![0x1B, 0x40]; // init
+    let put = |b: &mut Vec<u8>, s: &str| b.extend_from_slice(ascii(s).as_bytes());
+
+    // Header
+    b.extend([0x1B, 0x61, 1]); // Center
+    b.extend([0x1B, 0x45, 1]); // Bold
+    b.extend([0x1D, 0x21, 0x01]); // Double height
+    put(&mut b, &format!("{}\n", g(st, "store_name", "JOYCE POS")));
+    b.extend([0x1D, 0x21, 0x00]); // Normal
+    b.extend([0x1B, 0x45, 0]);
+    for k in ["store_address", "store_phone"] {
+        let v = g(st, k, "");
+        if !v.is_empty() {
+            put(&mut b, &format!("{}\n", v));
+        }
+    }
+    b.extend([0x1B, 0x45, 1]);
+    put(&mut b, "*** END OF DAY / Z-READING ***\n");
+    b.extend([0x1B, 0x45, 0]);
+    b.extend([0x1B, 0x61, 0]); // Left
+
+    put(&mut b, &dline);
+    let shift_id = shift["id"].as_i64().unwrap_or(0);
+    put(&mut b, &format!("Shift ID : #{}\n", shift_id));
+    put(&mut b, &format!("Date     : {}\n", shift["business_date"].as_str().unwrap_or("")));
+    put(&mut b, &format!("Opened At: {}\n", shift["opened_at"].as_str().unwrap_or("")));
+    put(&mut b, &format!("Opened By: {}\n", shift["opened_by"].as_str().unwrap_or("")));
+    put(&mut b, &format!("Closed By: {}\n", shift["closed_by"].as_str().unwrap_or("Cashier")));
+    put(&mut b, &line);
+
+    // Products breakdown: products x quantity = amount
+    b.extend([0x1B, 0x45, 1]);
+    put(&mut b, "PRODUCTS SOLD (QTY x AMOUNT):\n");
+    b.extend([0x1B, 0x45, 0]);
+    put(&mut b, &line);
+
+    let items = shift["sold_items"].as_array().cloned().unwrap_or_default();
+    if items.is_empty() {
+        put(&mut b, "No products sold in shift.\n");
+    } else {
+        for it in items {
+            let name = it["name"].as_str().unwrap_or("");
+            let vn = it["variant_name"].as_str().unwrap_or("");
+            let label = if vn.is_empty() { name.to_string() } else { format!("{} ({})", name, vn) };
+            let qty = it["quantity"].as_i64().unwrap_or(0);
+            let amt = it["amount"].as_f64().unwrap_or(0.0);
+            put(&mut b, &two(&format!("{} x {}", label, qty), &money(amt), w));
+        }
+    }
+    put(&mut b, &dline);
+
+    // Financial breakdown: Total Gross - Expenses - Salaries - Commissions - LD Comm = Net
+    let gross = shift["gross_sales"].as_f64().unwrap_or(shift["cash_sales"].as_f64().unwrap_or(0.0));
+    let expenses = shift["expenses"].as_f64().unwrap_or(0.0);
+    let salaries = shift["salaries"].as_f64().unwrap_or(0.0);
+    let commissions = shift["commissions"].as_f64().unwrap_or(0.0);
+    let ld_commissions = shift["ld_commissions"].as_f64().unwrap_or(0.0);
+
+    let disabled: Vec<String> = serde_json::from_str(g(st, "disabled_menus", "[]")).unwrap_or_default();
+    let show_exp = !disabled.contains(&"expenses".into());
+    let show_sal = !disabled.contains(&"salary".into()) && !disabled.contains(&"salaries".into());
+    let show_com = !disabled.contains(&"commission".into()) && !disabled.contains(&"commissions".into());
+    let show_ld = !disabled.contains(&"ld-commission".into()) && !disabled.contains(&"ld_commission".into());
+
+    let mut net = gross;
+    b.extend([0x1B, 0x45, 1]);
+    put(&mut b, &two("TOTAL GROSS SALES", &money(gross), w));
+    b.extend([0x1B, 0x45, 0]);
+
+    if show_exp {
+        net -= expenses;
+        put(&mut b, &two("- Store Expenses", &format!("-{}", money(expenses)), w));
+    }
+    if show_sal {
+        net -= salaries;
+        put(&mut b, &two("- Salaries Paid", &format!("-{}", money(salaries)), w));
+    }
+    if show_ld {
+        net -= ld_commissions;
+        put(&mut b, &two("- LD Comm Paid", &format!("-{}", money(ld_commissions)), w));
+    }
+    if show_com {
+        net -= commissions;
+        put(&mut b, &two("- Commissions Paid", &format!("-{}", money(commissions)), w));
+    }
+
+    put(&mut b, &line);
+    b.extend([0x1B, 0x45, 1]);
+    put(&mut b, &two("= NET OPERATING PROFIT", &money(net), w));
+    b.extend([0x1B, 0x45, 0]);
+    put(&mut b, &dline);
+
+    // Drawer Cash Reconciliation
+    let open_cash = shift["opening_cash"].as_f64().unwrap_or(0.0);
+    let cash_sales = shift["cash_sales"].as_f64().unwrap_or(0.0);
+    let total_outflows = (if show_exp { expenses } else { 0.0 })
+        + (if show_sal { salaries } else { 0.0 })
+        + (if show_com { commissions } else { 0.0 })
+        + (if show_ld { ld_commissions } else { 0.0 });
+    let expected = open_cash + cash_sales - total_outflows;
+    let actual = if closing_cash > 0.0 { closing_cash } else { expected };
+    let variance = actual - expected;
+
+    put(&mut b, &two("Opening Float", &money(open_cash), w));
+    put(&mut b, &two("+ Cash Sales", &money(cash_sales), w));
+    put(&mut b, &two("- Total Outflows", &format!("-{}", money(total_outflows)), w));
+    b.extend([0x1B, 0x45, 1]);
+    put(&mut b, &two("Expected in Drawer", &money(expected), w));
+    put(&mut b, &two("Actual Cash Counted", &money(actual), w));
+    let var_str = if variance.abs() < 0.01 {
+        "0.00 (Balanced)".to_string()
+    } else if variance > 0.0 {
+        format!("+{} (Overage)", money(variance))
+    } else {
+        format!("{} (Shortage)", money(variance))
+    };
+    put(&mut b, &two("Variance", &var_str, w));
+    b.extend([0x1B, 0x45, 0]);
+
+    if !closing_notes.is_empty() {
+        put(&mut b, &line);
+        put(&mut b, &format!("Notes: {}\n", ascii(closing_notes)));
+    }
+
+    put(&mut b, &dline);
+    b.extend([0x1B, 0x61, 1]); // Center
+    put(&mut b, "\n_______________________\nCashier Signature\n\n\n_______________________\nManager Signature\n\n");
+    put(&mut b, &format!("Printed: {}\n", crate::cmds::common::now()));
+
+    let feed: u8 = g(st, "feed_lines", "3").parse().unwrap_or(3);
+    b.extend([0x1B, 0x64, feed]);
+    if g(st, "cut_paper", "1") == "1" {
+        b.extend([0x1D, 0x56, 0x42, 0x00]);
+    }
+    if g(st, "open_drawer", "0") == "1" {
+        b.extend([0x1B, 0x70, 0x00, 0x19, 0xFA]);
+    }
+    b
+}
+
 pub fn send(st: &Settings, bytes: Vec<u8>) -> R<()> {
     let copies: usize = g(st, "copies", "1").parse().unwrap_or(1).clamp(1, 5);
     let data: Vec<u8> = bytes.repeat(copies);

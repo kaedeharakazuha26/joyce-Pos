@@ -62,10 +62,36 @@ pub fn get_shift_status(db: State<Db>) -> R<Value> {
                 |r| r.get(0)
             ).unwrap_or(0.0);
 
+            let gross_sales: f64 = c.query_row(
+                "SELECT COALESCE(SUM(total), 0) FROM sales WHERE status='completed' AND (shift_id = ?1 OR (shift_id IS NULL AND created_at >= ?2))",
+                params![shift_id, opened_at],
+                |r| r.get(0)
+            ).unwrap_or(0.0);
+
+            let orders_count: i64 = c.query_row(
+                "SELECT COUNT(*) FROM sales WHERE status='completed' AND (shift_id = ?1 OR (shift_id IS NULL AND created_at >= ?2))",
+                params![shift_id, opened_at],
+                |r| r.get(0)
+            ).unwrap_or(0);
+
+            let sold_items = rows(
+                &c,
+                "SELECT si.name, COALESCE(si.variant_name, '') AS variant_name, SUM(si.quantity) AS quantity, ROUND(SUM(si.subtotal), 2) AS amount
+                 FROM sale_items si
+                 JOIN sales s ON si.sale_id = s.id
+                 WHERE s.status='completed' AND (s.shift_id = ?1 OR (s.shift_id IS NULL AND s.created_at >= ?2))
+                 GROUP BY si.name, si.variant_name
+                 ORDER BY amount DESC",
+                &[&shift_id, &opened_at],
+            )?;
+
             let opening_cash = shift["opening_cash"].as_f64().unwrap_or(0.0);
             let total_outflows = expenses + salaries + commissions + ld_commissions;
             let expected_cash = opening_cash + cash_sales - total_outflows;
 
+            shift["gross_sales"] = json!(r2(gross_sales));
+            shift["orders_count"] = json!(orders_count);
+            shift["sold_items"] = Value::Array(sold_items);
             shift["cash_sales"] = json!(r2(cash_sales));
             shift["expenses"] = json!(r2(expenses));
             shift["salaries"] = json!(r2(salaries));
@@ -95,7 +121,37 @@ pub fn get_shift_status(db: State<Db>) -> R<Value> {
                     }))
                 }
             ).optional().map_err(e)?;
-            Ok(json!({ "is_open": false, "last_shift": last }))
+
+            let last_shift = if let Some(mut l) = last {
+                let last_id = l["id"].as_i64().unwrap_or(0);
+                let last_items = rows(
+                    &c,
+                    "SELECT si.name, COALESCE(si.variant_name, '') AS variant_name, SUM(si.quantity) AS quantity, ROUND(SUM(si.subtotal), 2) AS amount
+                     FROM sale_items si
+                     JOIN sales s ON si.sale_id = s.id
+                     WHERE s.status='completed' AND s.shift_id = ?1
+                     GROUP BY si.name, si.variant_name
+                     ORDER BY amount DESC",
+                    &[&last_id],
+                ).unwrap_or_default();
+                let last_gross: f64 = c.query_row(
+                    "SELECT COALESCE(SUM(total), 0) FROM sales WHERE status='completed' AND shift_id = ?1",
+                    params![last_id],
+                    |r| r.get(0)
+                ).unwrap_or(l["cash_sales"].as_f64().unwrap_or(0.0));
+                let last_orders: i64 = c.query_row(
+                    "SELECT COUNT(*) FROM sales WHERE status='completed' AND shift_id = ?1",
+                    params![last_id],
+                    |r| r.get(0)
+                ).unwrap_or(0);
+                l["gross_sales"] = json!(r2(last_gross));
+                l["orders_count"] = json!(last_orders);
+                l["sold_items"] = Value::Array(last_items);
+                Some(l)
+            } else {
+                None
+            };
+            Ok(json!({ "is_open": false, "last_shift": last_shift }))
         }
     }
 }
@@ -211,11 +267,31 @@ pub fn end_day(db: State<Db>, closing_cash: f64, closed_by: String, notes: Strin
         })
     });
 
+    let sold_items = rows(
+        &c,
+        "SELECT si.name, COALESCE(si.variant_name, '') AS variant_name, SUM(si.quantity) AS quantity, ROUND(SUM(si.subtotal), 2) AS amount
+         FROM sale_items si
+         JOIN sales s ON si.sale_id = s.id
+         WHERE s.status='completed' AND (s.shift_id = ?1 OR (s.shift_id IS NULL AND s.created_at >= ?2))
+         GROUP BY si.name, si.variant_name
+         ORDER BY amount DESC",
+        &[&shift_id, &opened_at],
+    ).unwrap_or_default();
+
+    let orders_count: i64 = c.query_row(
+        "SELECT COUNT(*) FROM sales WHERE status='completed' AND (shift_id = ?1 OR (shift_id IS NULL AND created_at >= ?2))",
+        params![shift_id, opened_at],
+        |r| r.get(0)
+    ).unwrap_or(0);
+
     Ok(json!({
         "id": shift_id,
         "business_date": biz_date,
         "opening_cash": r2(opening_cash),
+        "gross_sales": r2(cash_sales),
         "cash_sales": r2(cash_sales),
+        "orders_count": orders_count,
+        "sold_items": Value::Array(sold_items),
         "expenses": r2(expenses),
         "salaries": r2(salaries),
         "commissions": r2(commissions),

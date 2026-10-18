@@ -59,6 +59,7 @@ pub fn run() {
             cmds::reset_db,
             cmds::save_text_file,
             cmds::print_receipt,
+            cmds::print_z_reading,
             cmds::print_test,
             cmds::list_usb_devices,
             cmds::verify_pin,

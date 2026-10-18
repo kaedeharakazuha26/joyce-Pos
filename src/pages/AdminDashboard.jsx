@@ -86,6 +86,23 @@ export function AdminDashboard(props = {}) {
   const onClearExternalCommand =
     props.onClearExternalCommand || ctx.clearAdminReportIntent;
 
+  const settings = props.settings || ctx.settings || {};
+  const disabledMenus = React.useMemo(() => {
+    try {
+      return settings?.disabled_menus ? JSON.parse(settings.disabled_menus) : [];
+    } catch {
+      return [];
+    }
+  }, [settings?.disabled_menus]);
+
+  const showExpenses = !disabledMenus.includes("expenses");
+  const showSalary = !disabledMenus.includes("salary") && !disabledMenus.includes("salaries");
+  const showCommission = !disabledMenus.includes("commission") && !disabledMenus.includes("commissions");
+  const showLdCommission = !disabledMenus.includes("ld-commission") && !disabledMenus.includes("ld_commission");
+  const showOverheads = showExpenses || showSalary || showCommission || showLdCommission;
+  const showInventory = !disabledMenus.includes("inventory");
+  const showEmployees = !disabledMenus.includes("employees");
+
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [visibility, setVisibility] = useState(() => {
     try {
@@ -132,6 +149,8 @@ export function AdminDashboard(props = {}) {
     externalCommand,
     onClearExternalCommand,
     refreshBranchInfo,
+    settings,
+    disabledMenus,
   });
 
   const {
@@ -508,6 +527,7 @@ export function AdminDashboard(props = {}) {
               handleApplyDateRange={handleApplyDateRange}
               jumpToReport={jumpToReport}
               visibleTiles={visibility.tiles}
+              disabledMenus={disabledMenus}
             />
           )}
 
@@ -529,6 +549,7 @@ export function AdminDashboard(props = {}) {
               categoryFilter={categoryFilter}
               setCategoryFilter={setCategoryFilter}
               jumpToReport={jumpToReport}
+              disabledMenus={disabledMenus}
             />
           )}
 
@@ -538,6 +559,7 @@ export function AdminDashboard(props = {}) {
               reportTab={reportTab}
               setReportTab={setReportTab}
               visibleTabs={visibility.tabs}
+              disabledMenus={disabledMenus}
               from={from}
               to={to}
               search={search}
@@ -701,11 +723,11 @@ export function AdminDashboard(props = {}) {
                 {[
                   { key: "tile_sales", label: "Total Net Sales" },
                   { key: "tile_gross", label: "Gross Profit (P&L)" },
-                  { key: "tile_expenses", label: "Overheads & Payroll" },
+                  ...(showOverheads ? [{ key: "tile_expenses", label: "Overheads & Payroll" }] : []),
                   { key: "tile_net", label: "Net Store Profit" },
                   { key: "tile_today", label: "Today's Shift Sales" },
                   { key: "tile_mtd", label: "Month to Date (MTD)" },
-                  { key: "tile_stock", label: "Stock Alerts" },
+                  ...(showInventory ? [{ key: "tile_stock", label: "Stock Alerts" }] : []),
                   { key: "tile_voided", label: "Voided Orders" },
                 ].map((tile) => (
                   <label
@@ -739,7 +761,15 @@ export function AdminDashboard(props = {}) {
                 Store Reports & CRUD Tabs
               </h4>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                {REPORT_TABS.map((tab) => {
+                {REPORT_TABS.filter((tab) => {
+                  if (tab.id === "expenses" && !showExpenses) return false;
+                  if (tab.id === "salaries" && !showSalary) return false;
+                  if (tab.id === "commissions" && !showCommission) return false;
+                  if (tab.id === "ld-commissions" && !showLdCommission) return false;
+                  if (tab.id === "inventory-report" && !showInventory) return false;
+                  if (tab.id === "employees" && !showEmployees) return false;
+                  return true;
+                }).map((tab) => {
                   const tabKey = `tab_${tab.id}`;
                   const Icon = tab.icon;
                   return (

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Receipt,
   Wallet,
@@ -35,7 +35,31 @@ export function DashboardCrudModule({
   variantSales = [],
 }) {
   const toast = useToast();
+
+  const disabledMenus = useMemo(() => {
+    try {
+      return settings?.disabled_menus ? JSON.parse(settings.disabled_menus) : [];
+    } catch {
+      return [];
+    }
+  }, [settings?.disabled_menus]);
+
+  const showExpenses = !disabledMenus.includes("expenses");
+  const showSalary = !disabledMenus.includes("salary") && !disabledMenus.includes("salaries");
+  const showCommission = !disabledMenus.includes("commission") && !disabledMenus.includes("commissions");
+  const showLdCommission = !disabledMenus.includes("ld-commission") && !disabledMenus.includes("ld_commission");
+  const showInventory = !disabledMenus.includes("inventory");
+
   const [tab, setTab] = useState("sales"); // sales | inventory-report | expenses | salary | commission | ld-commission
+
+  useEffect(() => {
+    if (tab === "expenses" && !showExpenses) setTab("sales");
+    else if (tab === "salary" && !showSalary) setTab("sales");
+    else if (tab === "commission" && !showCommission) setTab("sales");
+    else if (tab === "ld-commission" && !showLdCommission) setTab("sales");
+    else if (tab === "inventory-report" && !showInventory) setTab("sales");
+  }, [tab, showExpenses, showSalary, showCommission, showLdCommission, showInventory]);
+
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [expandedInventory, setExpandedInventory] = useState({});
@@ -363,41 +387,51 @@ export function DashboardCrudModule({
           >
             <Receipt size={14} /> Sales & Receipts
           </button>
-          <button
-            type="button"
-            className={`chip ${tab === "inventory-report" ? "active" : ""}`}
-            onClick={() => setTab("inventory-report")}
-          >
-            <ClipboardList size={14} /> Inventory Report
-          </button>
-          <button
-            type="button"
-            className={`chip ${tab === "expenses" ? "active" : ""}`}
-            onClick={() => setTab("expenses")}
-          >
-            <Wallet size={14} /> Store Expenses
-          </button>
-          <button
-            type="button"
-            className={`chip ${tab === "salary" ? "active" : ""}`}
-            onClick={() => setTab("salary")}
-          >
-            <Users size={14} /> Salary Payroll
-          </button>
-          <button
-            type="button"
-            className={`chip ${tab === "commission" ? "active" : ""}`}
-            onClick={() => setTab("commission")}
-          >
-            <Coins size={14} /> Commissions
-          </button>
-          <button
-            type="button"
-            className={`chip ${tab === "ld-commission" ? "active" : ""}`}
-            onClick={() => setTab("ld-commission")}
-          >
-            <Smartphone size={14} /> LD Commissions
-          </button>
+          {showInventory && (
+            <button
+              type="button"
+              className={`chip ${tab === "inventory-report" ? "active" : ""}`}
+              onClick={() => setTab("inventory-report")}
+            >
+              <ClipboardList size={14} /> Inventory Report
+            </button>
+          )}
+          {showExpenses && (
+            <button
+              type="button"
+              className={`chip ${tab === "expenses" ? "active" : ""}`}
+              onClick={() => setTab("expenses")}
+            >
+              <Wallet size={14} /> Store Expenses
+            </button>
+          )}
+          {showSalary && (
+            <button
+              type="button"
+              className={`chip ${tab === "salary" ? "active" : ""}`}
+              onClick={() => setTab("salary")}
+            >
+              <Users size={14} /> Salary Payroll
+            </button>
+          )}
+          {showCommission && (
+            <button
+              type="button"
+              className={`chip ${tab === "commission" ? "active" : ""}`}
+              onClick={() => setTab("commission")}
+            >
+              <Coins size={14} /> Commissions
+            </button>
+          )}
+          {showLdCommission && (
+            <button
+              type="button"
+              className={`chip ${tab === "ld-commission" ? "active" : ""}`}
+              onClick={() => setTab("ld-commission")}
+            >
+              <Smartphone size={14} /> LD Commissions
+            </button>
+          )}
         </div>
       </div>
 

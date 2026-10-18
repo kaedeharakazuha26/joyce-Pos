@@ -21,7 +21,14 @@ export function AdminKpiGrid({
   handleApplyDateRange,
   jumpToReport,
   visibleTiles = {},
+  disabledMenus = [],
 }) {
+  const showExpenses = !disabledMenus.includes("expenses");
+  const showSalary = !disabledMenus.includes("salary") && !disabledMenus.includes("salaries");
+  const showCommission = !disabledMenus.includes("commission") && !disabledMenus.includes("commissions");
+  const showLdCommission = !disabledMenus.includes("ld-commission") && !disabledMenus.includes("ld_commission");
+  const showOverheads = showExpenses || showSalary || showCommission || showLdCommission;
+  const showInventory = !disabledMenus.includes("inventory");
   if (loading && !data) {
     return (
       <div className="kpi-skeleton-grid">
@@ -139,31 +146,50 @@ export function AdminKpiGrid({
       )}
 
       {/* Card 3: Store Expenses & Staff Pay */}
-      {(!visibleTiles || visibleTiles.tile_expenses !== false) && (
-        <div
-          className="kpi-card-v2 tone-warn"
-          onClick={() => jumpToReport("expenses")}
-          role="button"
-          tabIndex={0}
-          title="Click to view or add Store Expenses, Salaries & Commissions"
-        >
-          <div className="kpi-head">
-            <span className="kpi-title">3. Expenses & Staff Pay</span>
-            <span className="kpi-icon-box tone-warn"><Wallet size={17} /></span>
+      {showOverheads && (!visibleTiles || visibleTiles.tile_expenses !== false) && (() => {
+        const staffPay = (showSalary ? salariesAmt : 0) + (showCommission ? commAmt : 0) + (showLdCommission ? ldCommAmt : 0);
+        const badgeParts = [];
+        if (showExpenses) badgeParts.push(`Bills: ${pesoShort(expensesAmt)}`);
+        if (showSalary || showCommission || showLdCommission) badgeParts.push(`Staff: ${pesoShort(staffPay)}`);
+        const badgeLabel = badgeParts.join(" • ") || "No active overheads";
+
+        const footParts = [];
+        if (showSalary) footParts.push(`Sal ${pesoShort(salariesAmt)}`);
+        if (showCommission) footParts.push(`Comm ${pesoShort(commAmt)}`);
+        if (showLdCommission) footParts.push(`LD ${pesoShort(ldCommAmt)}`);
+        const footLabel = footParts.join(" • ") || (showExpenses ? "Operating bills and store overheads" : "Staff and operating overheads");
+
+        return (
+          <div
+            className="kpi-card-v2 tone-warn"
+            onClick={() => {
+              if (showExpenses) jumpToReport("expenses");
+              else if (showSalary) jumpToReport("salaries");
+              else if (showCommission) jumpToReport("commissions");
+              else if (showLdCommission) jumpToReport("ld-commissions");
+            }}
+            role="button"
+            tabIndex={0}
+            title="Click to view or add Store Expenses, Salaries & Commissions"
+          >
+            <div className="kpi-head">
+              <span className="kpi-title">3. Expenses & Staff Pay</span>
+              <span className="kpi-icon-box tone-warn"><Wallet size={17} /></span>
+            </div>
+            <div className="kpi-val">{peso(totalOverheads)}</div>
+            <div className="kpi-compare-row">
+              <StatusBadge
+                tone={overheadCompare.delta <= 0 ? "ok" : "warn"}
+                label={badgeLabel}
+              />
+            </div>
+            <div className="kpi-foot">
+              <span>{footLabel}</span>
+              <ExternalLink size={12} />
+            </div>
           </div>
-          <div className="kpi-val">{peso(totalOverheads)}</div>
-          <div className="kpi-compare-row">
-            <StatusBadge
-              tone={overheadCompare.delta <= 0 ? "ok" : "warn"}
-              label={`Bills: ${pesoShort(expensesAmt)} • Staff: ${pesoShort(salariesAmt + commAmt + ldCommAmt)}`}
-            />
-          </div>
-          <div className="kpi-foot">
-            <span>Sal {pesoShort(salariesAmt)} • Comm {pesoShort(commAmt)} • LD {pesoShort(ldCommAmt)}</span>
-            <ExternalLink size={12} />
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Card 4: Take-Home Net Profit */}
       {(!visibleTiles || visibleTiles.tile_net !== false) && (
@@ -264,7 +290,7 @@ export function AdminKpiGrid({
       )}
 
       {/* Card 7: Stock on Shelf & Low-Stock Alerts */}
-      {(!visibleTiles || visibleTiles.tile_stock !== false) && (
+      {showInventory && (!visibleTiles || visibleTiles.tile_stock !== false) && (
         <div
           className={`kpi-card-v2 ${
             outCount > 0 ? "tone-bad" : lowCount > 0 ? "tone-warn" : "tone-ok"

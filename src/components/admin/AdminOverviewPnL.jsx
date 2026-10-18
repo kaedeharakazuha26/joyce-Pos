@@ -78,8 +78,15 @@ export function AdminOverviewPnL({
   to,
   jumpToReport,
   onApplyDateRange,
+  disabledMenus = [],
 }) {
   if (!data) return null;
+
+  const showExpenses = !disabledMenus.includes("expenses");
+  const showSalary = !disabledMenus.includes("salary") && !disabledMenus.includes("salaries");
+  const showCommission = !disabledMenus.includes("commission") && !disabledMenus.includes("commissions");
+  const showLdCommission = !disabledMenus.includes("ld-commission") && !disabledMenus.includes("ld_commission");
+  const showOverheads = showExpenses || showSalary || showCommission || showLdCommission;
 
   const fin = data.financials || {};
   const prev = data.previous_period || {};
@@ -130,47 +137,59 @@ export function AdminOverviewPnL({
               <b className="text-info">{peso(fin.gross_profit)}</b>
             </div>
 
-            <div className="pnl-section-label">Operating Overheads & Payroll</div>
-            <div
-              className="pnl-row clickable"
-              onClick={() => jumpToReport("expenses")}
-            >
-              <span>
-                Store Operating Expenses ({(data.expenses_list || []).length} records)
-              </span>
-              <b className="text-bad">−{peso(fin.expenses)}</b>
-            </div>
-            <div
-              className="pnl-row clickable"
-              onClick={() => jumpToReport("salaries")}
-            >
-              <span>
-                Staff Salaries Payroll ({(data.salaries_list || []).length} records)
-              </span>
-              <b className="text-bad">−{peso(fin.salaries)}</b>
-            </div>
-            <div
-              className="pnl-row clickable"
-              onClick={() => jumpToReport("commissions")}
-            >
-              <span>
-                Regular Staff Commissions ({(data.commissions_list || []).length} records)
-              </span>
-              <b className="text-bad">−{peso(fin.commissions)}</b>
-            </div>
-            <div
-              className="pnl-row clickable"
-              onClick={() => jumpToReport("ld-commissions")}
-            >
-              <span>
-                Ladies Drink (LD) Commissions ({(data.ld_commissions_list || []).length} records)
-              </span>
-              <b className="text-bad">−{peso(fin.ld_commissions)}</b>
-            </div>
-            <div className="pnl-row sub">
-              <b>Total Operating Overheads</b>
-              <b className="text-bad">−{peso(fin.total_overheads)}</b>
-            </div>
+            {showOverheads && (
+              <div className="pnl-section-label">Operating Overheads & Payroll</div>
+            )}
+            {showExpenses && (
+              <div
+                className="pnl-row clickable"
+                onClick={() => jumpToReport("expenses")}
+              >
+                <span>
+                  Store Operating Expenses ({(data.expenses_list || []).length} records)
+                </span>
+                <b className="text-bad">−{peso(fin.expenses)}</b>
+              </div>
+            )}
+            {showSalary && (
+              <div
+                className="pnl-row clickable"
+                onClick={() => jumpToReport("salaries")}
+              >
+                <span>
+                  Staff Salaries Payroll ({(data.salaries_list || []).length} records)
+                </span>
+                <b className="text-bad">−{peso(fin.salaries)}</b>
+              </div>
+            )}
+            {showCommission && (
+              <div
+                className="pnl-row clickable"
+                onClick={() => jumpToReport("commissions")}
+              >
+                <span>
+                  Regular Staff Commissions ({(data.commissions_list || []).length} records)
+                </span>
+                <b className="text-bad">−{peso(fin.commissions)}</b>
+              </div>
+            )}
+            {showLdCommission && (
+              <div
+                className="pnl-row clickable"
+                onClick={() => jumpToReport("ld-commissions")}
+              >
+                <span>
+                  Ladies Drink (LD) Commissions ({(data.ld_commissions_list || []).length} records)
+                </span>
+                <b className="text-bad">−{peso(fin.ld_commissions)}</b>
+              </div>
+            )}
+            {showOverheads && (
+              <div className="pnl-row sub">
+                <b>Total Operating Overheads</b>
+                <b className="text-bad">−{peso(fin.total_overheads)}</b>
+              </div>
+            )}
 
             <div
               className={`pnl-row total ${
@@ -227,38 +246,46 @@ export function AdminOverviewPnL({
                     cmp: grossCompare,
                     money: true,
                   },
-                  {
+                  ...(showExpenses ? [{
                     label: "Store Expenses",
                     cur: fin.expenses,
                     prv: prev.expenses,
                     cmp: pctChange(fin.expenses, prev.expenses),
                     money: true,
                     invertTone: true,
-                  },
-                  {
+                  }] : []),
+                  ...(showSalary ? [{
                     label: "Staff Salaries",
                     cur: fin.salaries,
                     prv: prev.salaries,
                     cmp: pctChange(fin.salaries, prev.salaries),
                     money: true,
                     invertTone: true,
-                  },
-                  {
+                  }] : []),
+                  ...(showCommission ? [{
                     label: "Regular Commissions",
                     cur: fin.commissions,
                     prv: prev.commissions,
                     cmp: pctChange(fin.commissions, prev.commissions),
                     money: true,
                     invertTone: true,
-                  },
-                  {
+                  }] : []),
+                  ...(showLdCommission ? [{
                     label: "LD Commissions",
                     cur: fin.ld_commissions,
                     prv: prev.ld_commissions,
                     cmp: pctChange(fin.ld_commissions, prev.ld_commissions),
                     money: true,
                     invertTone: true,
-                  },
+                  }] : []),
+                  ...(showOverheads ? [{
+                    label: "Total Overheads",
+                    cur: fin.total_overheads,
+                    prv: prev.total_overheads,
+                    cmp: pctChange(fin.total_overheads, prev.total_overheads),
+                    money: true,
+                    invertTone: true,
+                  }] : []),
                   {
                     label: "Net Operating Profit",
                     cur: fin.net_profit,
@@ -313,10 +340,10 @@ export function AdminOverviewPnL({
                   <th className="num">Gross Sales</th>
                   <th className="num">COGS</th>
                   <th className="num">Gross Profit</th>
-                  <th className="num">Expenses</th>
-                  <th className="num">Salaries</th>
-                  <th className="num">Commissions</th>
-                  <th className="num">LD Comm</th>
+                  {showExpenses && <th className="num">Expenses</th>}
+                  {showSalary && <th className="num">Salaries</th>}
+                  {showCommission && <th className="num">Commissions</th>}
+                  {showLdCommission && <th className="num">LD Comm</th>}
                   <th className="num">Net Profit</th>
                 </tr>
               </thead>
@@ -348,10 +375,10 @@ export function AdminOverviewPnL({
                       <td className="num">{peso(sales)}</td>
                       <td className="num muted">{peso(cogs)}</td>
                       <td className="num">{peso(gross)}</td>
-                      <td className="num">{peso(exp)}</td>
-                      <td className="num">{peso(sal)}</td>
-                      <td className="num">{peso(com)}</td>
-                      <td className="num">{peso(ld)}</td>
+                      {showExpenses && <td className="num">{peso(exp)}</td>}
+                      {showSalary && <td className="num">{peso(sal)}</td>}
+                      {showCommission && <td className="num">{peso(com)}</td>}
+                      {showLdCommission && <td className="num">{peso(ld)}</td>}
                       <td className="num">
                         <b
                           style={{
@@ -380,18 +407,26 @@ export function AdminOverviewPnL({
                   <td className="num text-info">
                     {peso((data.daily || []).reduce((acc, d) => acc + Number(d.gross_profit ?? ((d.revenue ?? d.sales ?? 0) - (d.cogs || 0))), 0))}
                   </td>
-                  <td className="num text-bad">
-                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.expenses || 0), 0))}
-                  </td>
-                  <td className="num text-bad">
-                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.salaries || 0), 0))}
-                  </td>
-                  <td className="num text-bad">
-                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.commissions || 0), 0))}
-                  </td>
-                  <td className="num text-bad">
-                    {peso((data.daily || []).reduce((acc, d) => acc + Number(d.ld_commissions || 0), 0))}
-                  </td>
+                  {showExpenses && (
+                    <td className="num text-bad">
+                      {peso((data.daily || []).reduce((acc, d) => acc + Number(d.expenses || 0), 0))}
+                    </td>
+                  )}
+                  {showSalary && (
+                    <td className="num text-bad">
+                      {peso((data.daily || []).reduce((acc, d) => acc + Number(d.salaries || 0), 0))}
+                    </td>
+                  )}
+                  {showCommission && (
+                    <td className="num text-bad">
+                      {peso((data.daily || []).reduce((acc, d) => acc + Number(d.commissions || 0), 0))}
+                    </td>
+                  )}
+                  {showLdCommission && (
+                    <td className="num text-bad">
+                      {peso((data.daily || []).reduce((acc, d) => acc + Number(d.ld_commissions || 0), 0))}
+                    </td>
+                  )}
                   <td className="num">
                     {(() => {
                       const netTot = (data.daily || []).reduce((acc, d) => acc + Number(d.net_profit ?? d.net ?? 0), 0);

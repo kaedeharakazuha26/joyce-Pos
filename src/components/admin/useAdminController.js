@@ -22,6 +22,8 @@ export function useAdminController({
   externalCommand,
   onClearExternalCommand,
   refreshBranchInfo,
+  settings: propSettings,
+  disabledMenus: propDisabledMenus,
 }) {
   const safeToast = useCallback(
     (msg, type) => {
@@ -33,6 +35,22 @@ export function useAdminController({
     },
     [propToast]
   );
+
+  const disabledMenus = useMemo(() => {
+    if (Array.isArray(propDisabledMenus)) return propDisabledMenus;
+    try {
+      return propSettings?.disabled_menus ? JSON.parse(propSettings.disabled_menus) : [];
+    } catch {
+      return [];
+    }
+  }, [propDisabledMenus, propSettings?.disabled_menus]);
+
+  const showExpenses = !disabledMenus.includes("expenses");
+  const showSalary = !disabledMenus.includes("salary") && !disabledMenus.includes("salaries");
+  const showCommission = !disabledMenus.includes("commission") && !disabledMenus.includes("commissions");
+  const showLdCommission = !disabledMenus.includes("ld-commission") && !disabledMenus.includes("ld_commission");
+  const showInventory = !disabledMenus.includes("inventory");
+  const showEmployees = !disabledMenus.includes("employees");
 
   const activeBusinessDate = propBusinessDate || ymd();
 
@@ -74,6 +92,16 @@ export function useAdminController({
 
   // 3. Centralized Report Module & Filter State
   const [reportTab, setReportTab] = useState("overview");
+
+  useEffect(() => {
+    if (reportTab === "expenses" && !showExpenses) setReportTab("overview");
+    else if (reportTab === "salaries" && !showSalary) setReportTab("overview");
+    else if (reportTab === "commissions" && !showCommission) setReportTab("overview");
+    else if (reportTab === "ld-commissions" && !showLdCommission) setReportTab("overview");
+    else if (reportTab === "inventory-report" && !showInventory) setReportTab("overview");
+    else if (reportTab === "employees" && !showEmployees) setReportTab("overview");
+  }, [reportTab, showExpenses, showSalary, showCommission, showLdCommission, showInventory, showEmployees]);
+
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -193,15 +221,19 @@ export function useAdminController({
         const normEmpPerf = (rawDash?.top_employees || []).map((ep) => {
           const sName = ep.employee_name || ep.staff_name || "Staff";
           const k = sName.toLowerCase();
+          const sal = showSalary ? Number(ep.salary ?? ep.salary_total ?? 0) : 0;
+          const com = showCommission ? Number(ep.commission ?? ep.commission_total ?? 0) : 0;
+          const ld = showLdCommission ? Number(ep.ld_commission ?? ep.ld_total ?? 0) : 0;
+          const totalPayout = sal + com + ld;
           return {
             ...ep,
             staff_name: sName,
             role: empRoleByName[k] || "Staff",
-            salary_total: Number(ep.salary ?? ep.salary_total ?? 0),
-            commission_total: Number(ep.commission ?? ep.commission_total ?? 0),
-            ld_total: Number(ep.ld_commission ?? ep.ld_total ?? 0),
-            ld_drinks: ldDrinksByStaff[k] || 0,
-            total_payout: Number(ep.total ?? ep.total_payout ?? 0),
+            salary_total: sal,
+            commission_total: com,
+            ld_total: ld,
+            ld_drinks: showLdCommission ? (ldDrinksByStaff[k] || 0) : 0,
+            total_payout: totalPayout,
           };
         });
 
@@ -209,14 +241,12 @@ export function useAdminController({
           const salesVal = Number(d.sales ?? d.total ?? d.revenue ?? 0);
           const cogsVal = Number(d.cogs || 0);
           const gpVal = Number(d.gross_profit ?? salesVal - cogsVal);
-          const expVal = Number(d.expenses || 0);
-          const salVal = Number(d.salaries || 0);
-          const comVal = Number(d.commissions || 0);
-          const ldVal = Number(d.ld_commissions || 0);
+          const expVal = showExpenses ? Number(d.expenses || 0) : 0;
+          const salVal = showSalary ? Number(d.salaries || 0) : 0;
+          const comVal = showCommission ? Number(d.commissions || 0) : 0;
+          const ldVal = showLdCommission ? Number(d.ld_commissions || 0) : 0;
           const overheadsVal = expVal + salVal + comVal + ldVal;
-          const netVal = Number(
-            d.net_after_cogs ?? d.net ?? d.net_profit ?? gpVal - overheadsVal
-          );
+          const netVal = gpVal - overheadsVal;
           const dayStr = d.day || d.date || "";
           const orderCount = Number(d.orders ?? d.count ?? 0);
           return {
@@ -267,30 +297,48 @@ export function useAdminController({
               : a.filter,
         }));
 
+        const revenue = Number(rawDash?.revenue || 0);
+        const grossProfit = Number(rawDash?.gross_profit || 0);
+        const expTotal = showExpenses ? Number(rawDash?.expenses || 0) : 0;
+        const salTotal = showSalary ? Number(rawDash?.salaries || 0) : 0;
+        const comTotal = showCommission ? Number(rawDash?.commissions || 0) : 0;
+        const ldTotal = showLdCommission ? Number(rawDash?.ld_commissions || 0) : 0;
+        const totalOverheads = expTotal + salTotal + comTotal + ldTotal;
+        const netProfit = grossProfit - totalOverheads;
+        const netMargin = revenue > 0 ? (netProfit / revenue) * 100 : 0;
+
+        const prevExp = showExpenses ? Number(rawDash?.previous_period?.expenses || 0) : 0;
+        const prevSal = showSalary ? Number(rawDash?.previous_period?.salaries || 0) : 0;
+        const prevCom = showCommission ? Number(rawDash?.previous_period?.commissions || 0) : 0;
+        const prevLd = showLdCommission ? Number(rawDash?.previous_period?.ld_commissions || 0) : 0;
+        const prevOverheads = prevExp + prevSal + prevCom + prevLd;
+        const prevGross = Number(rawDash?.previous_period?.gross_profit || 0);
+        const prevNet = prevGross - prevOverheads;
+
         const normalizedDashboard = {
           ...rawDash,
           financials: {
-            revenue: Number(rawDash?.revenue || 0),
-            gross_sales: Number(rawDash?.revenue || 0),
+            revenue: revenue,
+            gross_sales: revenue,
             orders: Number(rawDash?.orders || 0),
             completed_orders: Number(rawDash?.orders || 0),
             avg_ticket: Number(rawDash?.avg_ticket || 0),
             cogs: Number(rawDash?.cogs || 0),
-            gross_profit: Number(rawDash?.gross_profit || 0),
+            gross_profit: grossProfit,
             gross_margin: Number(rawDash?.gross_margin || 0),
             gross_margin_pct: Number(rawDash?.gross_margin || 0),
-            expenses: Number(rawDash?.expenses || 0),
-            expenses_total: Number(rawDash?.expenses || 0),
-            salaries: Number(rawDash?.salaries || 0),
-            salaries_total: Number(rawDash?.salaries || 0),
-            commissions: Number(rawDash?.commissions || 0),
-            commissions_total: Number(rawDash?.commissions || 0),
-            ld_commissions: Number(rawDash?.ld_commissions || 0),
-            ld_commissions_total: Number(rawDash?.ld_commissions || 0),
-            total_overheads: Number(rawDash?.total_overheads || 0),
-            net_profit: Number(rawDash?.net_profit || 0),
-            net_margin: Number(rawDash?.net_margin || 0),
-            net_margin_pct: Number(rawDash?.net_margin || 0),
+            expenses: expTotal,
+            expenses_total: expTotal,
+            salaries: salTotal,
+            salaries_total: salTotal,
+            commissions: comTotal,
+            commissions_total: comTotal,
+            ld_commissions: ldTotal,
+            ld_commissions_total: ldTotal,
+            total_overheads: totalOverheads,
+            net_profit: netProfit,
+            net_margin: netMargin,
+            net_margin_pct: netMargin,
             void_total: Number(rawDash?.voided_total || 0),
             voided_total: Number(rawDash?.voided_total || 0),
             void_count: Number(rawDash?.voided_count || 0),
@@ -303,11 +351,17 @@ export function useAdminController({
           },
           previous: {
             gross_sales: Number(rawDash?.previous_period?.revenue || 0),
+            revenue: Number(rawDash?.previous_period?.revenue || 0),
             completed_orders: Number(rawDash?.previous_period?.orders || 0),
+            orders: Number(rawDash?.previous_period?.orders || 0),
             cogs: Number(rawDash?.previous_period?.cogs || 0),
-            gross_profit: Number(rawDash?.previous_period?.gross_profit || 0),
-            total_overheads: Number(rawDash?.previous_period?.total_overheads || 0),
-            net_profit: Number(rawDash?.previous_period?.net_profit || 0),
+            gross_profit: prevGross,
+            expenses: prevExp,
+            salaries: prevSal,
+            commissions: prevCom,
+            ld_commissions: prevLd,
+            total_overheads: prevOverheads,
+            net_profit: prevNet,
             voided_total: Number(rawDash?.previous_period?.voided_total || 0),
             daily: normPrevDaily,
           },
@@ -1016,6 +1070,7 @@ export function useAdminController({
       filteredShifts,
       filteredAudit,
       daily: data?.daily || [],
+      disabledMenus,
     });
 
   const handleExportCSV = () => {

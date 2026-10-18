@@ -79,18 +79,34 @@ export function AdminReportsModule({
   loadAll,
   toast,
   visibleTabs = {},
+  disabledMenus = [],
 }) {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
-  const availableTabs = REPORT_TABS.filter(
-    (t) => !visibleTabs || visibleTabs[`tab_${t.id}`] !== false
-  );
+
+  const showExpenses = !disabledMenus.includes("expenses");
+  const showSalary = !disabledMenus.includes("salary") && !disabledMenus.includes("salaries");
+  const showCommission = !disabledMenus.includes("commission") && !disabledMenus.includes("commissions");
+  const showLdCommission = !disabledMenus.includes("ld-commission") && !disabledMenus.includes("ld_commission");
+  const showInventory = !disabledMenus.includes("inventory");
+  const showEmployees = !disabledMenus.includes("employees");
+
+  const availableTabs = REPORT_TABS.filter((t) => {
+    if (visibleTabs && visibleTabs[`tab_${t.id}`] === false) return false;
+    if (t.id === "expenses" && !showExpenses) return false;
+    if (t.id === "salaries" && !showSalary) return false;
+    if (t.id === "commissions" && !showCommission) return false;
+    if (t.id === "ld-commissions" && !showLdCommission) return false;
+    if (t.id === "inventory-report" && !showInventory) return false;
+    if (t.id === "employees" && !showEmployees) return false;
+    return true;
+  });
 
   useEffect(() => {
-    if (visibleTabs && availableTabs.length > 0 && !availableTabs.some((t) => t.id === reportTab)) {
+    if (availableTabs.length > 0 && !availableTabs.some((t) => t.id === reportTab)) {
       setReportTab(availableTabs[0].id);
     }
-  }, [visibleTabs, availableTabs, reportTab, setReportTab]);
+  }, [availableTabs, reportTab, setReportTab]);
   const [sortConfig, setSortConfig] = useState({ key: "", dir: "desc" });
 
   useEffect(() => {
@@ -475,6 +491,7 @@ export function AdminReportsModule({
             to={to}
             jumpToReport={jumpToReport}
             onApplyDateRange={onApplyDateRange}
+            disabledMenus={disabledMenus}
           />
         )}
 

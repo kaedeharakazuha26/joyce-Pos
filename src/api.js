@@ -48,6 +48,8 @@ export const api = {
   resetDb: (pin, keepCatalog = true) => call("reset_db", { pin, keepCatalog }),
   saveTextFile: (path, content) => call("save_text_file", { path, content }),
   printReceipt: (saleId) => call("print_receipt", { saleId }),
+  printZReading: (shiftId, closingCash, closingNotes, closedBy) =>
+    call("print_z_reading", { shiftId, closingCash, closingNotes, closedBy }),
   printTest: () => call("print_test"),
   usbDevices: () => call("list_usb_devices"),
   verifyPin: (pin) => call("verify_pin", { pin }),

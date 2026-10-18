@@ -744,11 +744,18 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   #printable-eod-report, #printable-eod-report *,
   #printable-admin-report, #printable-admin-report *,
   #printable-admin-employee-report, #printable-admin-employee-report *,
-  #printable-shift-zreading, #printable-shift-zreading * {
+  #printable-shift-zreading, #printable-shift-zreading *,
+  #printable-thermal-z-reading, #printable-thermal-z-reading * {
     visibility: visible;
   }
   #receipt-print {
     position: absolute; left: 0; top: 0; box-shadow: none; padding: 0;
+  }
+  #printable-thermal-z-reading {
+    position: absolute; left: 0; top: 0; width: 300px !important; max-width: 300px !important;
+    box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 !important;
+    background: #fff !important; color: #000 !important;
+    font-family: 'Courier New', Courier, monospace !important; font-size: 12px !important;
   }
   #printable-employee-report, #printable-eod-report, #printable-admin-report, #printable-admin-employee-report, #printable-shift-zreading {
     position: absolute; left: 0; top: 0; width: 100%; box-shadow: none; padding: 24px;
@@ -765,6 +772,66 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   .sign-line {
     border-color: #000 !important;
   }
+}
+
+/* ── Thermal Paper Receipt Preview (On-Screen & Print) ── */
+.thermal-receipt-preview {
+  background: #ffffff;
+  color: #111111;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+  line-height: 1.35;
+  width: 100%;
+  max-width: 360px;
+  margin: 0 auto;
+  padding: 16px;
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  border: 1px dashed #cccccc;
+}
+.thermal-receipt-header {
+  text-align: center;
+  margin-bottom: 10px;
+}
+.thermal-receipt-header h3 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #000000;
+}
+.thermal-receipt-dline {
+  border-top: 1px dashed #333333;
+  margin: 8px 0;
+}
+.thermal-receipt-sline {
+  border-top: 1px dotted #888888;
+  margin: 6px 0;
+}
+.thermal-receipt-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.thermal-receipt-row.bold {
+  font-weight: bold;
+}
+.thermal-signatures {
+  margin-top: 22px;
+  display: flex;
+  justify-content: space-between;
+  text-align: center;
+  font-size: 11px;
+}
+.thermal-sig-block {
+  width: 46%;
+}
+.thermal-sig-line {
+  border-bottom: 1px solid #333333;
+  margin-bottom: 4px;
+  height: 26px;
 }
 
 /* ── Shift Gating & Lockdown Styles ── */

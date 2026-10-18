@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   TrendingUp,
   PieChart as PieChartIcon,
@@ -397,7 +397,14 @@ export function AdminChartsSection({
   data,
   categoryFilter,
   jumpToReport,
+  disabledMenus = [],
 }) {
+  const showExpenses = !disabledMenus.includes("expenses");
+  const showSalary = !disabledMenus.includes("salary") && !disabledMenus.includes("salaries");
+  const showCommission = !disabledMenus.includes("commission") && !disabledMenus.includes("commissions");
+  const showLdCommission = !disabledMenus.includes("ld-commission") && !disabledMenus.includes("ld_commission");
+  const showInventory = !disabledMenus.includes("inventory");
+
   const [trendGranularity, setTrendGranularity] = useState("daily");
   const [trendChartMode, setTrendChartMode] = useState("bar");
   const [showPrevPeriod, setShowPrevPeriod] = useState(true);
@@ -413,6 +420,17 @@ export function AdminChartsSection({
   const [doughnutMode, setDoughnutMode] = useState("category");
   const [statusChartMode, setStatusChartMode] = useState("sales");
   const [employeeReportView, setEmployeeReportView] = useState("all"); // "all" | "salary" | "commission" | "ld" | "products"
+
+  useEffect(() => {
+    if (employeeReportView === "salary" && !showSalary) setEmployeeReportView("all");
+    else if (employeeReportView === "commission" && !showCommission) setEmployeeReportView("all");
+    else if (employeeReportView === "ld" && !showLdCommission) setEmployeeReportView("all");
+    else if (employeeReportView === "products" && !showInventory) setEmployeeReportView("all");
+  }, [employeeReportView, showSalary, showCommission, showLdCommission, showInventory]);
+
+  useEffect(() => {
+    if (doughnutMode === "expense" && !showExpenses) setDoughnutMode("category");
+  }, [doughnutMode, showExpenses]);
 
   const fin = data?.financials || {};
   const prev = data?.previous_period || {};
@@ -431,10 +449,10 @@ export function AdminChartsSection({
     { key: "revenue", label: "Gross Sales", color: "#ff7a3d", enabled: seriesEnabled.revenue },
     { key: "gross_profit", label: "Gross Profit", color: "#38bdf8", enabled: seriesEnabled.gross_profit },
     { key: "net_profit", label: "Net Operating Profit", color: "#2fcf8a", enabled: seriesEnabled.net_profit },
-    { key: "expenses", label: "Store Expenses", color: "#f5b83d", enabled: seriesEnabled.expenses },
-    { key: "salaries", label: "Salaries", color: "#a855f7", enabled: seriesEnabled.salaries },
-    { key: "commissions", label: "Commissions", color: "#14b8a6", enabled: seriesEnabled.commissions },
-    { key: "ld_commissions", label: "LD Commissions", color: "#ec4899", enabled: seriesEnabled.ld_commissions },
+    ...(showExpenses ? [{ key: "expenses", label: "Store Expenses", color: "#f5b83d", enabled: seriesEnabled.expenses }] : []),
+    ...(showSalary ? [{ key: "salaries", label: "Salaries", color: "#a855f7", enabled: seriesEnabled.salaries }] : []),
+    ...(showCommission ? [{ key: "commissions", label: "Commissions", color: "#14b8a6", enabled: seriesEnabled.commissions }] : []),
+    ...(showLdCommission ? [{ key: "ld_commissions", label: "LD Commissions", color: "#ec4899", enabled: seriesEnabled.ld_commissions }] : []),
   ];
 
   const doughnutItems = useMemo(() => {
@@ -448,6 +466,7 @@ export function AdminChartsSection({
       }));
     }
     if (doughnutMode === "expense") {
+      if (!showExpenses) return [];
       const expList = data.expenses_by_cat || data.expenses_by_category || [];
       return expList.map((c, idx) => ({
         name: c.category || "General",
@@ -458,12 +477,12 @@ export function AdminChartsSection({
     }
     return [
       { name: "Cost of Goods (COGS)", value: Number(fin.cogs || 0), color: "#38bdf8", target: "products" },
-      { name: "Store Expenses", value: Number(fin.expenses || 0), color: "#f5b83d", target: "expenses" },
-      { name: "Staff Salaries", value: Number(fin.salaries || 0), color: "#a855f7", target: "salaries" },
-      { name: "Regular Commissions", value: Number(fin.commissions || 0), color: "#14b8a6", target: "commissions" },
-      { name: "LD Commissions", value: Number(fin.ld_commissions || 0), color: "#ec4899", target: "ld-commissions" },
+      ...(showExpenses ? [{ name: "Store Expenses", value: Number(fin.expenses || 0), color: "#f5b83d", target: "expenses" }] : []),
+      ...(showSalary ? [{ name: "Staff Salaries", value: Number(fin.salaries || 0), color: "#a855f7", target: "salaries" }] : []),
+      ...(showCommission ? [{ name: "Regular Commissions", value: Number(fin.commissions || 0), color: "#14b8a6", target: "commissions" }] : []),
+      ...(showLdCommission ? [{ name: "LD Commissions", value: Number(fin.ld_commissions || 0), color: "#ec4899", target: "ld-commissions" }] : []),
     ].filter((i) => i.value > 0);
-  }, [data, doughnutMode, fin]);
+  }, [data, doughnutMode, fin, showExpenses, showSalary, showCommission, showLdCommission]);
 
   const statusChartItems = useMemo(() => {
     if (!data) return [];
@@ -545,26 +564,36 @@ export function AdminChartsSection({
     }
 
     const rawEmps = (data.employee_performance && data.employee_performance.length > 0)
-      ? data.employee_performance.map((e) => ({
-          type: "employee",
-          name: e.staff_name,
-          salary: Number(e.salary_total || 0),
-          commission: Number(e.commission_total || 0),
-          ld_commission: Number(e.ld_total || 0),
-          ld_drinks: Number(e.ld_drinks || 0),
-          total: Number(e.total_payout || 0),
-          color: "#a855f7",
-        }))
-      : (data.top_employees || []).map((e) => ({
-          type: "employee",
-          name: e.employee_name,
-          salary: Number(e.salary || 0),
-          commission: Number(e.commission || 0),
-          ld_commission: Number(e.ld_commission || 0),
-          ld_drinks: 0,
-          total: Number(e.total || (Number(e.salary || 0) + Number(e.commission || 0) + Number(e.ld_commission || 0))),
-          color: "#a855f7",
-        }));
+      ? data.employee_performance.map((e) => {
+          const sal = showSalary ? Number(e.salary_total || 0) : 0;
+          const com = showCommission ? Number(e.commission_total || 0) : 0;
+          const ld = showLdCommission ? Number(e.ld_total || 0) : 0;
+          return {
+            type: "employee",
+            name: e.staff_name,
+            salary: sal,
+            commission: com,
+            ld_commission: ld,
+            ld_drinks: showLdCommission ? Number(e.ld_drinks || 0) : 0,
+            total: sal + com + ld,
+            color: "#a855f7",
+          };
+        })
+      : (data.top_employees || []).map((e) => {
+          const sal = showSalary ? Number(e.salary || 0) : 0;
+          const com = showCommission ? Number(e.commission || 0) : 0;
+          const ld = showLdCommission ? Number(e.ld_commission || 0) : 0;
+          return {
+            type: "employee",
+            name: e.employee_name,
+            salary: sal,
+            commission: com,
+            ld_commission: ld,
+            ld_drinks: 0,
+            total: sal + com + ld,
+            color: "#a855f7",
+          };
+        });
 
     const sorted = [...rawEmps];
     if (employeeReportView === "salary") {
@@ -694,13 +723,15 @@ export function AdminChartsSection({
               >
                 Sales by Cat
               </button>
-              <button
-                type="button"
-                className={doughnutMode === "expense" ? "active" : ""}
-                onClick={() => setDoughnutMode("expense")}
-              >
-                Expenses
-              </button>
+              {showExpenses && (
+                <button
+                  type="button"
+                  className={doughnutMode === "expense" ? "active" : ""}
+                  onClick={() => setDoughnutMode("expense")}
+                >
+                  Expenses
+                </button>
+              )}
               <button
                 type="button"
                 className={doughnutMode === "overhead" ? "active" : ""}
@@ -801,10 +832,10 @@ export function AdminChartsSection({
             <div className="segmented-control" style={{ flexWrap: "wrap", gap: 2 }}>
               {[
                 { id: "all", label: "All Earnings" },
-                { id: "salary", label: "Salary" },
-                { id: "commission", label: "Commissions" },
-                { id: "ld", label: "LD Drinks" },
-                { id: "products", label: "Top Products" },
+                ...(showSalary ? [{ id: "salary", label: "Salary" }] : []),
+                ...(showCommission ? [{ id: "commission", label: "Commissions" }] : []),
+                ...(showLdCommission ? [{ id: "ld", label: "LD Drinks" }] : []),
+                ...(showInventory ? [{ id: "products", label: "Top Products" }] : []),
               ].map((btn) => (
                 <button
                   key={btn.id}
@@ -835,13 +866,13 @@ export function AdminChartsSection({
                       </>
                     ) : (
                       <>
-                        {employeeReportView !== "commission" && employeeReportView !== "ld" && (
+                        {showSalary && employeeReportView !== "commission" && employeeReportView !== "ld" && (
                           <th className="num">Salary</th>
                         )}
-                        {employeeReportView !== "salary" && employeeReportView !== "ld" && (
+                        {showCommission && employeeReportView !== "salary" && employeeReportView !== "ld" && (
                           <th className="num">Commission</th>
                         )}
-                        {employeeReportView !== "salary" && employeeReportView !== "commission" && (
+                        {showLdCommission && employeeReportView !== "salary" && employeeReportView !== "commission" && (
                           <th className="num">LD Comm</th>
                         )}
                         <th className="num">Total Income</th>
@@ -901,13 +932,13 @@ export function AdminChartsSection({
                           </>
                         ) : (
                           <>
-                            {employeeReportView !== "commission" && employeeReportView !== "ld" && (
+                            {showSalary && employeeReportView !== "commission" && employeeReportView !== "ld" && (
                               <td className="num muted">{peso(item.salary)}</td>
                             )}
-                            {employeeReportView !== "salary" && employeeReportView !== "ld" && (
+                            {showCommission && employeeReportView !== "salary" && employeeReportView !== "ld" && (
                               <td className="num muted">{peso(item.commission)}</td>
                             )}
-                            {employeeReportView !== "salary" && employeeReportView !== "commission" && (
+                            {showLdCommission && employeeReportView !== "salary" && employeeReportView !== "commission" && (
                               <td className="num muted">
                                 {peso(item.ld_commission)}
                                 {item.ld_drinks > 0 && (

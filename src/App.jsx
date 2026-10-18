@@ -51,7 +51,7 @@ import Salary from "./pages/Salary";
 import { Commission, LDCommission } from "./pages/Commissions";
 import Employees from "./pages/Employees";
 import Settings from "./pages/Settings";
-import { monthStart, peso, ymd } from "./utils";
+import { monthStart, peso, ymd, errText } from "./utils";
 
 const SettingsCtx = createContext({
   settings: {},
@@ -192,6 +192,8 @@ export default function App() {
     notes: "",
   });
   const [submittingShift, setSubmittingShift] = useState(false);
+  const [eodViewMode, setEodViewMode] = useState("reconciliation"); // "reconciliation" | "receipt"
+  const [printingZReading, setPrintingZReading] = useState(false);
 
   const toggleSidebarCollapse = () => {
     setSidebarCollapsed((prev) => {
@@ -467,6 +469,19 @@ export default function App() {
       alert("Failed to end day: " + err);
     } finally {
       setSubmittingShift(false);
+    }
+  };
+
+  const handlePrintZReadingThermal = async (shift) => {
+    setPrintingZReading(true);
+    try {
+      const closingVal = eodForm.closingCash !== "" ? Number(eodForm.closingCash) : Number(shift.expected_cash || 0);
+      await api.printZReading(shift.id, closingVal, eodForm.notes, currentUser?.name || "Cashier");
+      alert("Thermal Z-Reading successfully sent to thermal printer!");
+    } catch (e) {
+      alert("Thermal printer error: " + errText(e));
+    } finally {
+      setPrintingZReading(false);
     }
   };
 
@@ -1419,192 +1434,412 @@ export default function App() {
               const shift = shiftStatus.shift;
               const openCash = Number(shift.opening_cash || 0);
               const cashSales = Number(shift.cash_sales || 0);
-              const expenses = Number(shift.expenses || 0);
-              const salaries = Number(shift.salaries || 0);
-              const commissions = Number(shift.commissions || 0);
-              const ldCommissions = Number(shift.ld_commissions || 0);
-              const totalOutflows = expenses + salaries + commissions + ldCommissions;
+
+              const showExpenses = !disabledMenus.includes("expenses");
+              const showSalary = !disabledMenus.includes("salary") && !disabledMenus.includes("salaries");
+              const showCommission = !disabledMenus.includes("commission") && !disabledMenus.includes("commissions");
+              const showLdCommission = !disabledMenus.includes("ld-commission") && !disabledMenus.includes("ld_commission");
+
+              const activeExpenses = showExpenses ? Number(shift.expenses || 0) : 0;
+              const activeSalaries = showSalary ? Number(shift.salaries || 0) : 0;
+              const activeCommissions = showCommission ? Number(shift.commissions || 0) : 0;
+              const activeLdCommissions = showLdCommission ? Number(shift.ld_commissions || 0) : 0;
+
+              const totalOutflows = activeExpenses + activeSalaries + activeCommissions + activeLdCommissions;
               const expected = openCash + cashSales - totalOutflows;
               const actual = eodForm.closingCash !== "" ? Number(eodForm.closingCash) : null;
               const variance = actual !== null ? actual - expected : null;
+              const grossSales = Number(shift.gross_sales || cashSales);
+              const netProfit = grossSales - activeExpenses - activeSalaries - activeCommissions - activeLdCommissions;
+              const soldItems = Array.isArray(shift.sold_items) ? shift.sold_items : [];
 
               return (
-                <Modal title="End of Day (EOD) — Shift Reconciliation" onClose={() => setShowEodModal(false)}>
-                  <div id="printable-eod-report" style={{ marginBottom: 16 }}>
-                    <div
-                      style={{
-                        display: "grid",
-                        gridTemplateColumns: "1fr 1fr",
-                        gap: 10,
-                        background: "var(--card)",
-                        padding: 14,
-                        borderRadius: 10,
-                        fontSize: 13,
-                        marginBottom: 14,
-                        border: "1px solid var(--border)",
-                      }}
-                    >
-                      <div>
-                        <span className="muted">Business Date:</span><br />
-                        <b>{shift.business_date}</b>
-                      </div>
-                      <div>
-                        <span className="muted">Branch:</span><br />
-                        <b>{activeBranchName}</b>
-                      </div>
-                      <div>
-                        <span className="muted">Opened By:</span><br />
-                        <span>{shift.opened_by} ({shift.opened_at?.slice(11, 16)})</span>
-                      </div>
-                      <div>
-                        <span className="muted">Closed By:</span><br />
-                        <span>{currentUser?.name || "Cashier"}</span>
-                      </div>
+                <Modal
+                  title={`End of Day (EOD) — Shift #${shift.id} (${shift.business_date})`}
+                  onClose={() => setShowEodModal(false)}
+                >
+                  {/* Top Switcher & Action Toolbar */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 14,
+                      flexWrap: "wrap",
+                      gap: 8,
+                    }}
+                  >
+                    <div className="segmented-control" style={{ margin: 0 }}>
+                      <button
+                        type="button"
+                        className={eodViewMode === "reconciliation" ? "active" : ""}
+                        onClick={() => setEodViewMode("reconciliation")}
+                      >
+                        📋 Shift Reconciliation
+                      </button>
+                      <button
+                        type="button"
+                        className={eodViewMode === "receipt" ? "active" : ""}
+                        onClick={() => setEodViewMode("receipt")}
+                      >
+                        🧾 Thermal Z-Reading Receipt
+                      </button>
                     </div>
 
-                    {/* Breakdown table */}
-                    <div style={{ border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", marginBottom: 14 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-                        <span>Opening Cash Float</span>
-                        <b>{peso(openCash)}</b>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-                        <span>+ Total Cash Sales</span>
-                        <b style={{ color: "var(--ok)" }}>+{peso(cashSales)}</b>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-                        <span>- Store Expenses Paid</span>
-                        <b style={{ color: "var(--bad)" }}>-{peso(expenses)}</b>
-                      </div>
-                      {salaries > 0 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-                          <span>- Salaries Paid</span>
-                          <b style={{ color: "var(--bad)" }}>-{peso(salaries)}</b>
-                        </div>
-                      )}
-                      {commissions > 0 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-                          <span>- Commissions Paid</span>
-                          <b style={{ color: "var(--bad)" }}>-{peso(commissions)}</b>
-                        </div>
-                      )}
-                      {ldCommissions > 0 && (
-                        <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
-                          <span>- LD Commissions Paid</span>
-                          <b style={{ color: "var(--bad)" }}>-{peso(ldCommissions)}</b>
-                        </div>
-                      )}
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          padding: "12px 14px",
-                          background: "rgba(255, 122, 61, 0.08)",
-                          fontSize: 15,
-                        }}
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button
+                        type="button"
+                        className="btn sm ghost"
+                        onClick={() => handlePrintZReadingThermal(shift)}
+                        disabled={printingZReading}
+                        title="Send receipt directly to USB/thermal printer via ESC/POS"
                       >
-                        <b>Expected Cash in Drawer</b>
-                        <b style={{ color: "var(--accent)" }}>{peso(expected)}</b>
-                      </div>
+                        <Printer size={14} /> {printingZReading ? "Printing…" : "Thermal Printer"}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn sm ghost"
+                        onClick={() => window.print()}
+                        title="Print via standard system printer dialog"
+                      >
+                        Browser Print
+                      </button>
                     </div>
                   </div>
 
-                  <form onSubmit={handleEndDay}>
-                    <Field label="Actual Cash Counted in Drawer (₱)">
-                      <input
-                        autoFocus
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={eodForm.closingCash}
-                        onChange={(e) => setEodForm({ ...eodForm, closingCash: e.target.value })}
-                        placeholder="e.g. 15250.00"
-                        required
-                      />
-                    </Field>
-
-                    {variance !== null && (
-                      <div
-                        style={{
-                          padding: 12,
-                          borderRadius: 10,
-                          marginBottom: 16,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          background:
-                            variance === 0
-                              ? "rgba(47, 207, 138, 0.1)"
-                              : variance > 0
-                              ? "rgba(47, 207, 138, 0.15)"
-                              : "rgba(255, 84, 112, 0.15)",
-                          border: `1px solid ${
-                            variance >= 0 ? "rgba(47, 207, 138, 0.4)" : "rgba(255, 84, 112, 0.4)"
-                          }`,
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          {variance === 0 ? (
-                            <CheckCircle2 size={18} color="var(--ok)" />
-                          ) : (
-                            <AlertCircle size={18} color={variance > 0 ? "var(--ok)" : "var(--bad)"} />
-                          )}
-                          <span style={{ fontSize: 13, fontWeight: 600 }}>
-                            {variance === 0
-                              ? "Drawer Exactly Balanced"
-                              : variance > 0
-                              ? `Cash Overage (+${peso(variance)})`
-                              : `Cash Shortage (${peso(variance)})`}
-                          </span>
+                  {/* VIEW 1: Thermal Receipt Paper Preview */}
+                  {eodViewMode === "receipt" ? (
+                    <div style={{ maxHeight: "70vh", overflowY: "auto", padding: "4px 0" }}>
+                      <div id="printable-thermal-z-reading" className="thermal-receipt-preview">
+                        <div className="thermal-receipt-header">
+                          <h3>{settings?.store_name || "JOYCE POS"}</h3>
+                          {settings?.store_address && <div>{settings.store_address}</div>}
+                          {settings?.store_phone && <div>Tel: {settings.store_phone}</div>}
+                          <div style={{ marginTop: 4, fontWeight: "bold" }}>*** END OF DAY / Z-READING ***</div>
                         </div>
-                        <b style={{ color: variance >= 0 ? "var(--ok)" : "var(--bad)" }}>
-                          {variance >= 0 ? `+${peso(variance)}` : peso(variance)}
-                        </b>
+
+                        <div className="thermal-receipt-dline" />
+                        <div className="thermal-receipt-row"><span>Shift ID :</span><b>#{shift.id}</b></div>
+                        <div className="thermal-receipt-row"><span>Date     :</span><b>{shift.business_date}</b></div>
+                        <div className="thermal-receipt-row"><span>Opened At:</span><span>{shift.opened_at}</span></div>
+                        <div className="thermal-receipt-row"><span>Opened By:</span><span>{shift.opened_by}</span></div>
+                        <div className="thermal-receipt-row"><span>Closed By:</span><span>{currentUser?.name || "Cashier"}</span></div>
+                        <div className="thermal-receipt-dline" />
+
+                        {/* Products Breakdown: Products x Quantity = Amount */}
+                        <div style={{ fontWeight: "bold", margin: "6px 0 4px 0" }}>PRODUCTS SOLD (QTY x AMOUNT):</div>
+                        <div className="thermal-receipt-sline" />
+                        {soldItems.length === 0 ? (
+                          <div className="muted" style={{ fontStyle: "italic", textAlign: "center", padding: "6px 0" }}>
+                            No products sold during this shift.
+                          </div>
+                        ) : (
+                          soldItems.map((item, idx) => {
+                            const label = item.variant_name ? `${item.name} (${item.variant_name})` : item.name;
+                            return (
+                              <div key={idx} className="thermal-receipt-row">
+                                <span style={{ maxWidth: "68%", wordBreak: "break-word" }}>
+                                  {label} x {item.quantity}
+                                </span>
+                                <b>{peso(Number(item.amount || 0))}</b>
+                              </div>
+                            );
+                          })
+                        )}
+                        <div className="thermal-receipt-dline" />
+
+                        {/* P&L Operating Net Formula: Gross - Expenses - Salaries - LD - Comm = Net */}
+                        <div className="thermal-receipt-row bold" style={{ fontSize: "14px" }}>
+                          <span>TOTAL GROSS SALES</span>
+                          <span>{peso(grossSales)}</span>
+                        </div>
+
+                        {showExpenses && (
+                          <div className="thermal-receipt-row">
+                            <span>- Store Expenses</span>
+                            <span>-{peso(activeExpenses)}</span>
+                          </div>
+                        )}
+                        {showSalary && (
+                          <div className="thermal-receipt-row">
+                            <span>- Salaries Paid</span>
+                            <span>-{peso(activeSalaries)}</span>
+                          </div>
+                        )}
+                        {showLdCommission && (
+                          <div className="thermal-receipt-row">
+                            <span>- LD Comm Paid</span>
+                            <span>-{peso(activeLdCommissions)}</span>
+                          </div>
+                        )}
+                        {showCommission && (
+                          <div className="thermal-receipt-row">
+                            <span>- Commissions Paid</span>
+                            <span>-{peso(activeCommissions)}</span>
+                          </div>
+                        )}
+
+                        <div className="thermal-receipt-sline" />
+                        <div className="thermal-receipt-row bold" style={{ fontSize: "14px" }}>
+                          <span>= NET OPERATING PROFIT</span>
+                          <span style={{ color: netProfit >= 0 ? "#008000" : "#d00000" }}>{peso(netProfit)}</span>
+                        </div>
+                        <div className="thermal-receipt-dline" />
+
+                        {/* Drawer Cash Reconciliation */}
+                        <div className="thermal-receipt-row"><span>Opening Float</span><span>{peso(openCash)}</span></div>
+                        <div className="thermal-receipt-row"><span>+ Cash Sales</span><span>+{peso(cashSales)}</span></div>
+                        <div className="thermal-receipt-row"><span>- Total Outflows</span><span>-{peso(totalOutflows)}</span></div>
+                        <div className="thermal-receipt-sline" />
+                        <div className="thermal-receipt-row bold"><span>Expected in Drawer</span><span>{peso(expected)}</span></div>
+                        <div className="thermal-receipt-row bold">
+                          <span>Actual Cash Counted</span>
+                          <span>{actual !== null ? peso(actual) : "Pending count"}</span>
+                        </div>
+                        {actual !== null && (
+                          <div className="thermal-receipt-row bold">
+                            <span>Variance</span>
+                            <span>
+                              {Math.abs(variance) < 0.01
+                                ? "0.00 (Balanced)"
+                                : variance > 0
+                                ? `+${peso(variance)} (Overage)`
+                                : `${peso(variance)} (Shortage)`}
+                            </span>
+                          </div>
+                        )}
+
+                        {eodForm.notes && (
+                          <>
+                            <div className="thermal-receipt-sline" />
+                            <div style={{ fontSize: 11, wordBreak: "break-word" }}>
+                              <b>Notes:</b> {eodForm.notes}
+                            </div>
+                          </>
+                        )}
+
+                        <div className="thermal-signatures">
+                          <div className="thermal-sig-block">
+                            <div className="thermal-sig-line" />
+                            <span>Cashier Signature</span>
+                          </div>
+                          <div className="thermal-sig-block">
+                            <div className="thermal-sig-line" />
+                            <span>Manager Signature</span>
+                          </div>
+                        </div>
                       </div>
-                    )}
 
-                    <Field label="Closing Notes / Shift Summary">
-                      <input
-                        value={eodForm.notes}
-                        onChange={(e) => setEodForm({ ...eodForm, notes: e.target.value })}
-                        placeholder="e.g. Deposit prepared, drawer locked"
-                      />
-                    </Field>
-
-                    <div
-                      style={{
-                        background: "rgba(56, 189, 248, 0.08)",
-                        border: "1px solid rgba(56, 189, 248, 0.3)",
-                        borderRadius: 10,
-                        padding: "10px 12px",
-                        fontSize: 12,
-                        marginTop: 10,
-                        lineHeight: 1.5,
-                      }}
-                    >
-                      <b>☁️ Safe End-of-Day Backup:</b> Closing the day will automatically save a clean, corruption-free snapshot (<code>VACUUM INTO</code>) to{" "}
-                      <b>{branchInfo?.storage_dir ? "your Google Drive EOD_Backups folder" : "your local EOD_Backups folder"}</b>.
+                      <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+                        <button
+                          type="button"
+                          className="btn primary"
+                          onClick={() => handlePrintZReadingThermal(shift)}
+                          disabled={printingZReading}
+                          style={{ flex: 1 }}
+                        >
+                          <Printer size={16} /> {printingZReading ? "Printing…" : "Print to Thermal Printer"}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn ghost"
+                          onClick={() => setEodViewMode("reconciliation")}
+                        >
+                          ← Shift Reconciliation
+                        </button>
+                      </div>
                     </div>
+                  ) : (
+                    /* VIEW 2: Shift Reconciliation & Drawer Count */
+                    <div>
+                      <div id="printable-eod-report" style={{ marginBottom: 16 }}>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr",
+                            gap: 10,
+                            background: "var(--card)",
+                            padding: 14,
+                            borderRadius: 10,
+                            fontSize: 13,
+                            marginBottom: 14,
+                            border: "1px solid var(--border)",
+                          }}
+                        >
+                          <div>
+                            <span className="muted">Business Date:</span><br />
+                            <b>{shift.business_date}</b>
+                          </div>
+                          <div>
+                            <span className="muted">Branch:</span><br />
+                            <b>{activeBranchName}</b>
+                          </div>
+                          <div>
+                            <span className="muted">Opened By:</span><br />
+                            <span>{shift.opened_by} ({shift.opened_at?.slice(11, 16)})</span>
+                          </div>
+                          <div>
+                            <span className="muted">Closed By:</span><br />
+                            <span>{currentUser?.name || "Cashier"}</span>
+                          </div>
+                        </div>
 
-                    <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
-                      <button
-                        type="button"
-                        className="btn ghost"
-                        onClick={() => window.print()}
-                        title="Print drawer summary"
-                      >
-                        <Printer size={16} /> Print Z-Reading
-                      </button>
-                      <button
-                        type="submit"
-                        className="btn danger"
-                        disabled={submittingShift || eodForm.closingCash === ""}
-                        style={{ flex: 1 }}
-                      >
-                        <Sunset size={16} /> {submittingShift ? "Closing & Backing Up…" : "Confirm End of Day & Save EOD Backup"}
-                      </button>
+                        {/* Breakdown table */}
+                        <div style={{ border: "1px solid var(--border)", borderRadius: 10, overflow: "hidden", marginBottom: 14 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+                            <span>Opening Cash Float</span>
+                            <b>{peso(openCash)}</b>
+                          </div>
+                          <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+                            <span>+ Total Cash Sales</span>
+                            <b style={{ color: "var(--ok)" }}>+{peso(cashSales)}</b>
+                          </div>
+                          {showExpenses && (
+                            <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+                              <span>- Store Expenses Paid</span>
+                              <b style={{ color: "var(--bad)" }}>-{peso(activeExpenses)}</b>
+                            </div>
+                          )}
+                          {showSalary && activeSalaries > 0 && (
+                            <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+                              <span>- Salaries Paid</span>
+                              <b style={{ color: "var(--bad)" }}>-{peso(activeSalaries)}</b>
+                            </div>
+                          )}
+                          {showCommission && activeCommissions > 0 && (
+                            <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+                              <span>- Commissions Paid</span>
+                              <b style={{ color: "var(--bad)" }}>-{peso(activeCommissions)}</b>
+                            </div>
+                          )}
+                          {showLdCommission && activeLdCommissions > 0 && (
+                            <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 14px", borderBottom: "1px solid var(--border)" }}>
+                              <span>- LD Commissions Paid</span>
+                              <b style={{ color: "var(--bad)" }}>-{peso(activeLdCommissions)}</b>
+                            </div>
+                          )}
+                          <div
+                            style={{
+                              display: "flex",
+                              justifyContent: "space-between",
+                              padding: "12px 14px",
+                              background: "rgba(255, 122, 61, 0.08)",
+                              fontSize: 15,
+                            }}
+                          >
+                            <b>Expected Cash in Drawer</b>
+                            <b style={{ color: "var(--accent)" }}>{peso(expected)}</b>
+                          </div>
+                        </div>
+                      </div>
+
+                      <form onSubmit={handleEndDay}>
+                        <Field label="Actual Cash Counted in Drawer (₱)">
+                          <input
+                            autoFocus
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={eodForm.closingCash}
+                            onChange={(e) => setEodForm({ ...eodForm, closingCash: e.target.value })}
+                            placeholder="e.g. 15250.00"
+                            required
+                          />
+                        </Field>
+
+                        {variance !== null && (
+                          <div
+                            style={{
+                              padding: 12,
+                              borderRadius: 10,
+                              marginBottom: 16,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              background:
+                                variance === 0
+                                  ? "rgba(47, 207, 138, 0.1)"
+                                  : variance > 0
+                                  ? "rgba(47, 207, 138, 0.15)"
+                                  : "rgba(255, 84, 112, 0.15)",
+                              border: `1px solid ${
+                                variance >= 0 ? "rgba(47, 207, 138, 0.4)" : "rgba(255, 84, 112, 0.4)"
+                              }`,
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              {variance === 0 ? (
+                                <CheckCircle2 size={18} color="var(--ok)" />
+                              ) : (
+                                <AlertCircle size={18} color={variance > 0 ? "var(--ok)" : "var(--bad)"} />
+                              )}
+                              <span style={{ fontSize: 13, fontWeight: 600 }}>
+                                {variance === 0
+                                  ? "Drawer Exactly Balanced"
+                                  : variance > 0
+                                  ? `Cash Overage (+${peso(variance)})`
+                                  : `Cash Shortage (${peso(variance)})`}
+                              </span>
+                            </div>
+                            <b style={{ color: variance >= 0 ? "var(--ok)" : "var(--bad)" }}>
+                              {variance >= 0 ? `+${peso(variance)}` : peso(variance)}
+                            </b>
+                          </div>
+                        )}
+
+                        <Field label="Closing Notes / Shift Summary">
+                          <input
+                            value={eodForm.notes}
+                            onChange={(e) => setEodForm({ ...eodForm, notes: e.target.value })}
+                            placeholder="e.g. Deposit prepared, drawer locked"
+                          />
+                        </Field>
+
+                        <div
+                          style={{
+                            background: "rgba(56, 189, 248, 0.08)",
+                            border: "1px solid rgba(56, 189, 248, 0.3)",
+                            borderRadius: 10,
+                            padding: "10px 12px",
+                            fontSize: 12,
+                            marginTop: 10,
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          <b>☁️ Safe End-of-Day Backup:</b> Closing the day will automatically save a clean, corruption-free snapshot (<code>VACUUM INTO</code>) to{" "}
+                          <b>{branchInfo?.storage_dir ? "your Google Drive EOD_Backups folder" : "your local EOD_Backups folder"}</b>.
+                        </div>
+
+                        <div style={{ display: "flex", gap: 10, marginTop: 18, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            className="btn ghost"
+                            onClick={() => setEodViewMode("receipt")}
+                            title="Preview Thermal Z-Reading format"
+                          >
+                            <ReceiptIcon size={16} /> Preview Z-Reading
+                          </button>
+                          <button
+                            type="button"
+                            className="btn ghost"
+                            onClick={() => handlePrintZReadingThermal(shift)}
+                            disabled={printingZReading}
+                            title="Print thermal Z-Reading receipt via ESC/POS"
+                          >
+                            <Printer size={16} /> {printingZReading ? "Printing…" : "Print Thermal"}
+                          </button>
+                          <button
+                            type="submit"
+                            className="btn danger"
+                            disabled={submittingShift || eodForm.closingCash === ""}
+                            style={{ flex: 1, minWidth: 200 }}
+                          >
+                            <Sunset size={16} /> {submittingShift ? "Closing & Backing Up…" : "Confirm End of Day & Save EOD Backup"}
+                          </button>
+                        </div>
+                      </form>
                     </div>
-                  </form>
+                  )}
                 </Modal>
               );
             })()}
